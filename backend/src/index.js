@@ -11,7 +11,22 @@ import { analytics } from './routes/analytics.js';
 const app = new Hono();
 
 app.use('*', logger());
-app.use('*', cors({ origin: '*' })); // en producción restringir al dominio del frontend
+
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:61224',
+  'https://nume-lovat.vercel.app',
+];
+app.use('*', cors({
+  origin: (origin) => {
+    if (!origin) return origin; // permitir requests sin origin (curl, server-to-server)
+    if (ALLOWED_ORIGINS.includes(origin)) return origin;
+    // Permitir cualquier preview/branch deploy de Vercel del mismo proyecto
+    if (/^https:\/\/nume-[\w-]+\.vercel\.app$/.test(origin)) return origin;
+    return null;
+  },
+}));
 
 app.route('/api', menu);
 app.route('/api/admin', admin);
