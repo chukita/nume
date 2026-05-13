@@ -1,0 +1,1561 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>NuMe — Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin></script>
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs@master/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #f3efe8; --bg-2: #e9e3d6; --ink: #0d0d0c;
+      --ink-soft: #4a4845; --ink-faint: #8a857a; --line: #d6cfbf;
+      --fluo: #d8ff3a; --coral: #ff5a3c; --white: #ffffff;
+      --sidebar-w: 240px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 14px; color: var(--ink);
+      background: var(--bg); -webkit-font-smoothing: antialiased;
+    }
+    /* ── Layout ── */
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--ink); color: var(--bg);
+      display: flex; flex-direction: column;
+      padding: 24px 0; overflow-y: auto;
+    }
+    .sidebar-logo {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      font-size: 26px; letter-spacing: -0.04em;
+      padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-logo span { background: var(--fluo); color: var(--ink); padding: 0 5px; border-radius: 4px; }
+    .sidebar-badge {
+      font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.05em; color: rgba(255,255,255,0.4);
+      padding: 8px 20px 0; text-transform: uppercase;
+    }
+    .sidebar-nav { flex: 1; padding: 12px 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500;
+      color: rgba(255,255,255,0.65); border-radius: 0;
+      transition: background .12s, color .12s;
+      border: none; background: transparent; width: 100%; text-align: left;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.07); color: #fff; }
+    .nav-item.active { background: var(--fluo); color: var(--ink); }
+    .nav-item svg { flex-shrink: 0; }
+    .sidebar-footer {
+      padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-email {
+      font-size: 12px; color: rgba(255,255,255,0.45);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 10px;
+    }
+    .btn-logout {
+      font: inherit; font-size: 12px; font-weight: 600;
+      padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+      background: transparent; color: rgba(255,255,255,0.6);
+      cursor: pointer; width: 100%; text-align: left;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.08); color: #fff; }
+    .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .topbar {
+      padding: 20px 32px; background: var(--white);
+      border-bottom: 1.5px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      font-size: 22px; letter-spacing: -0.02em;
+    }
+    .content { padding: 28px 32px; flex: 1; }
+    /* ── Auth screen ── */
+    .auth-wrap {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      background: var(--ink);
+    }
+    .auth-card {
+      background: var(--bg); border-radius: 24px;
+      padding: 36px; width: 100%; max-width: 400px;
+    }
+    .auth-logo {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      font-size: 36px; letter-spacing: -0.04em; margin-bottom: 6px;
+    }
+    .auth-logo span { background: var(--fluo); padding: 0 6px; border-radius: 5px; }
+    .auth-sub { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; }
+    .auth-tabs { display: flex; gap: 0; margin-bottom: 24px; background: var(--bg-2); border-radius: 10px; padding: 4px; }
+    .auth-tab {
+      flex: 1; padding: 8px; border: none; background: transparent;
+      border-radius: 8px; font: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; color: var(--ink-faint);
+    }
+    .auth-tab.on { background: var(--white); color: var(--ink); }
+    /* ── Forms ── */
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 5px; font-family: 'JetBrains Mono', monospace; }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 11px 14px; border: 1.5px solid var(--line);
+      border-radius: 10px; font: inherit; font-size: 14px; background: var(--white);
+      color: var(--ink); outline: none; transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--ink); }
+    .field textarea { resize: vertical; min-height: 80px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .error-msg { color: var(--coral); font-size: 12px; margin-top: 8px; }
+    /* ── Buttons ── */
+    .btn {
+      font: inherit; font-family: 'Space Grotesk', sans-serif; font-weight: 600;
+      font-size: 14px; padding: 12px 20px; border-radius: 10px; border: 1.5px solid var(--ink);
+      cursor: pointer; transition: transform .1s, opacity .1s; display: inline-flex;
+      align-items: center; gap: 8px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-primary { background: var(--ink); color: var(--bg); }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-fluo { background: var(--fluo); color: var(--ink); border-color: var(--ink); }
+    .btn-ghost { background: transparent; color: var(--ink); }
+    .btn-ghost:hover { background: var(--bg-2); }
+    .btn-danger { background: transparent; color: var(--coral); border-color: var(--coral); }
+    .btn-sm { padding: 7px 12px; font-size: 12px; border-radius: 8px; }
+    .btn-full { width: 100%; justify-content: center; }
+    /* ── Cards / Tables ── */
+    .card {
+      background: var(--white); border: 1.5px solid var(--line);
+      border-radius: 16px; overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px; border-bottom: 1.5px solid var(--line);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-header h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th {
+      text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 10px;
+      letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+      padding: 10px 20px; border-bottom: 1.5px solid var(--line); font-weight: 500;
+    }
+    .table td { padding: 12px 20px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .table tr:last-child td { border-bottom: 0; }
+    .table tr:hover td { background: var(--bg); }
+    .plate-thumb {
+      width: 44px; height: 44px; border-radius: 8px; object-fit: cover;
+      background: var(--bg-2); display: block;
+    }
+    .badge {
+      display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 9px;
+      font-weight: 700; letter-spacing: 0.05em; padding: 2px 6px; border-radius: 4px;
+    }
+    .badge-promo { background: var(--coral); color: #fff; }
+    .badge-new   { background: var(--fluo); color: var(--ink); }
+    .badge-veg   { border: 1px solid #2a7a40; color: #2a7a40; }
+    .badge-spicy { border: 1px solid var(--coral); color: var(--coral); }
+    .badge-sin_tacc { border: 1px solid #b8861a; color: #b8861a; }
+    .badge-out   { background: var(--ink-faint); color: #fff; }
+    .active-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .active-dot.on  { background: #1f8a5b; }
+    .active-dot.off { background: var(--ink-faint); }
+    /* ── Category row expand ── */
+    .cat-row { cursor: pointer; }
+    .cat-row td:first-child { font-weight: 600; }
+    .cat-items-section { background: var(--bg); }
+    .cat-items-section td { padding: 0; }
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(13,13,12,0.55);
+      display: flex; align-items: center; justify-content: center; z-index: 100;
+      padding: 20px;
+    }
+    .modal {
+      background: var(--white); border-radius: 20px; padding: 28px;
+      width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+    .modal-header h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; }
+    .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+    .btn-icon { background: none; border: none; cursor: pointer; color: var(--ink-faint); padding: 4px; border-radius: 6px; }
+    .btn-icon:hover { background: var(--bg-2); color: var(--ink); }
+    /* ── Stats row ── */
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .stat-card {
+      background: var(--white); border: 1.5px solid var(--line); border-radius: 14px;
+      padding: 18px 20px;
+    }
+    .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); margin-bottom: 6px; }
+    .stat-value { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 32px; letter-spacing: -0.03em; line-height: 1; }
+    /* ── Misc ── */
+    .empty-state { padding: 48px; text-align: center; color: var(--ink-faint); }
+    .tags-input { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--white); cursor: text; }
+    .tag-chip { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+    .tag-chip-promo { background: var(--coral); color: #fff; }
+    .tag-chip-new { background: var(--fluo); color: var(--ink); }
+    .tag-chip-veg { border: 1px solid #2a7a40; color: #2a7a40; }
+    .tag-chip-spicy { border: 1px solid var(--coral); color: var(--coral); }
+    .tag-chip-out { background: var(--ink-faint); color: #fff; }
+    .tag-chip button { background: none; border: none; cursor: pointer; opacity: 0.7; font-size: 13px; line-height: 1; }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.15); border-top-color: var(--ink); border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ── Image uploader ── */
+    .img-uploader {
+      border: 2px dashed var(--line); border-radius: 12px; overflow: hidden;
+      transition: border-color .15s, background .15s; background: var(--bg);
+      cursor: pointer; position: relative;
+    }
+    .img-uploader:hover, .img-uploader.drag { border-color: var(--ink); background: var(--bg-2); }
+    .img-uploader.has-img { border-style: solid; border-color: var(--line); }
+    .img-uploader input[type=file] { display: none; }
+    .img-uploader .placeholder {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; padding: 24px; color: var(--ink-faint); pointer-events: none;
+    }
+    .img-uploader .placeholder svg { opacity: .5; }
+    .img-uploader .placeholder p { font-size: 12px; text-align: center; line-height: 1.4; margin: 0; }
+    .img-uploader .placeholder b { color: var(--ink); }
+    .img-uploader .preview {
+      width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; pointer-events: none;
+    }
+    .img-uploader .preview-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: rgba(13,13,12,0.06); gap: 8px;
+    }
+    .img-uploader .preview-bar span { font-size: 11px; font-family: 'JetBrains Mono',monospace; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex:1; }
+    .img-upload-progress { height: 3px; background: var(--fluo); transition: width .3s; }
+    .toast-bar {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--ink); color: var(--bg); padding: 10px 20px; border-radius: 999px;
+      font-family: 'JetBrains Mono', monospace; font-size: 12px; z-index: 200;
+      animation: fadeup .2s ease;
+    }
+    @keyframes fadeup { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── Config ──────────────────────────────────────────────────────
+const API_BASE = (window.__NUME_API__ || 'http://localhost:3000');
+const SUPABASE_URL = window.__SUPABASE_URL__ || '';
+const SUPABASE_ANON = window.__SUPABASE_ANON__ || '';
+
+let sb = null;
+if (SUPABASE_URL && SUPABASE_ANON) {
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  window.__sb = sb;
+}
+
+// ── API helper ──────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const session = sb ? (await sb.auth.getSession()).data.session : null;
+  const token = session?.access_token;
+  const res = await fetch(`${API_BASE}/api/admin${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...opts,
+  });
+  if (res.status === 204) return null;
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  return json;
+}
+
+// ── Icons ────────────────────────────────────────────────────────
+const Ic = {
+  menu: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+  tag:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>,
+  home: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>,
+  plus: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+  edit: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  trash:<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>,
+  close:<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  chev: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>,
+};
+
+const TAG_OPTIONS = ['promo', 'new', 'veg', 'spicy', 'sin_tacc', 'out'];
+const TAG_LABELS = { promo: '−20%', new: 'NUEVO', veg: 'VEG', spicy: 'PICA', sin_tacc: 'SIN TACC', out: 'AGOTADO' };
+
+// ── Toast ────────────────────────────────────────────────────────
+function useToast() {
+  const [msg, setMsg] = useState('');
+  const t = useRef();
+  const show = useCallback((m) => {
+    setMsg(m); clearTimeout(t.current);
+    t.current = setTimeout(() => setMsg(''), 2400);
+  }, []);
+  return [msg, show];
+}
+
+// ── Auth Screen ──────────────────────────────────────────────────
+function AuthScreen({ onAuth }) {
+  const [tab, setTab] = useState('login');
+  const [email, setEmail] = useState('');
+  const [pass, setPass] = useState('');
+  const [slug, setSlug] = useState('');
+  const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!sb) {
+    return (
+      <div className="auth-wrap">
+        <div className="auth-card">
+          <div className="auth-logo">Nu<span>Me</span></div>
+          <p className="auth-sub">Panel de administración</p>
+          <div style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 10, padding: 16, fontSize: 13 }}>
+            <b>Configuración pendiente.</b><br />
+            Agregá estas variables antes del cierre del &lt;body&gt;:<br /><br />
+            <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+              &lt;script&gt;<br />
+              &nbsp;window.__SUPABASE_URL__ = 'https://xxx.supabase.co';<br />
+              &nbsp;window.__SUPABASE_ANON__ = 'eyJ...';<br />
+              &nbsp;window.__NUME_API__ = 'http://localhost:3000';<br />
+              &lt;/script&gt;
+            </code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      if (tab === 'login') {
+        const { error: err } = await sb.auth.signInWithPassword({ email, password: pass });
+        if (err) throw err;
+      } else {
+        const { data, error: err } = await sb.auth.signUp({ email, password: pass });
+        if (err) throw err;
+        // Onboard: crear tenant
+        const token = data.session?.access_token;
+        if (token) {
+          const res = await fetch(`${API_BASE}/api/admin/onboard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ slug, name }),
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.error);
+        }
+      }
+      const { data: { session } } = await sb.auth.getSession();
+      onAuth(session);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-logo">Nu<span>Me</span></div>
+        <p className="auth-sub">Panel de administración</p>
+        <div className="auth-tabs">
+          <button className={'auth-tab' + (tab === 'login' ? ' on' : '')} onClick={() => setTab('login')}>Ingresar</button>
+          <button className={'auth-tab' + (tab === 'signup' ? ' on' : '')} onClick={() => setTab('signup')}>Registrarse</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          <div className="field">
+            <label>Email</label>
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="hola@milocal.com" />
+          </div>
+          <div className="field">
+            <label>Contraseña</label>
+            <input type="password" value={pass} onChange={e => setPass(e.target.value)} required placeholder="mínimo 8 caracteres" />
+          </div>
+          {tab === 'signup' && <>
+            <div className="field">
+              <label>Nombre del local</label>
+              <input value={name} onChange={e => setName(e.target.value)} required placeholder="Bar El Farol" />
+            </div>
+            <div className="field">
+              <label>Slug (URL del menú)</label>
+              <input value={slug} onChange={e => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,''))} required placeholder="bar-el-farol" />
+              <p style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 4 }}>Los clientes verán: <b>tu-dominio/{slug || 'slug'}</b></p>
+            </div>
+          </>}
+          {error && <p className="error-msg">{error}</p>}
+          <button type="submit" className="btn btn-fluo btn-full" style={{ marginTop: 6 }} disabled={loading}>
+            {loading ? <span className="spinner" /> : (tab === 'login' ? 'Ingresar' : 'Crear cuenta')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── Tags Input ───────────────────────────────────────────────────
+function TagsInput({ value, onChange }) {
+  const available = TAG_OPTIONS.filter(t => !value.includes(t));
+  return (
+    <div>
+      <div className="tags-input" style={{ minHeight: 42 }}>
+        {value.map(t => (
+          <span key={t} className={`tag-chip tag-chip-${t}`}>
+            {TAG_LABELS[t] || t}
+            <button type="button" onClick={() => onChange(value.filter(x => x !== t))}>×</button>
+          </span>
+        ))}
+      </div>
+      {available.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+          {available.map(t => (
+            <button key={t} type="button" className={`badge badge-${t}`} style={{ cursor: 'pointer', padding: '3px 8px' }}
+              onClick={() => onChange([...value, t])}>
+              + {TAG_LABELS[t] || t}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Item Modal ───────────────────────────────────────────────────
+function ItemModal({ item, categoryId, onSave, onClose }) {
+  const [form, setForm] = useState({
+    name: item?.name || '',
+    description: item?.description || '',
+    price: item?.price || '',
+    image_url: item?.image_url || '',
+    tags: item?.tags || [],
+    active: item?.active ?? true,
+    category_id: categoryId || item?.category_id || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleSave() {
+    setError(''); setSaving(true);
+    try {
+      const payload = { ...form, price: Number(form.price) };
+      let result;
+      if (item?.id) {
+        result = await api(`/items/${item.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      } else {
+        result = await api('/items', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      onSave(result);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>{item?.id ? 'Editar plato' : 'Nuevo plato'}</h2>
+          <button className="btn-icon" onClick={onClose}>{Ic.close}</button>
+        </div>
+        <div className="field">
+          <label>Nombre</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Milanesa napolitana" />
+        </div>
+        <div className="field">
+          <label>Descripción</label>
+          <textarea value={form.description} onChange={e => set('description', e.target.value)} placeholder="Ingredientes, preparación..." />
+        </div>
+        <div className="field-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Precio ($)</label>
+            <input type="number" value={form.price} onChange={e => set('price', e.target.value)} placeholder="8900" />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Activo</label>
+            <select value={form.active} onChange={e => set('active', e.target.value === 'true')}>
+              <option value="true">Sí</option>
+              <option value="false">No (agotado)</option>
+            </select>
+          </div>
+        </div>
+        <div className="field">
+          <label>Foto del plato</label>
+          <ImageUploader value={form.image_url} onChange={v => set('image_url', v)} type="item" aspect="4/3" />
+        </div>
+        <div className="field">
+          <label>Etiquetas</label>
+          <TagsInput value={form.tags} onChange={v => set('tags', v)} />
+        </div>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-fluo" onClick={handleSave} disabled={saving}>
+            {saving ? <span className="spinner" /> : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Category Modal ───────────────────────────────────────────────
+function CategoryModal({ cat, onSave, onClose }) {
+  const [form, setForm] = useState({
+    label: cat?.label || '',
+    image_url: cat?.image_url || '',
+    featured: cat?.featured ?? false,
+    active: cat?.active ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleSave() {
+    setError(''); setSaving(true);
+    try {
+      let result;
+      if (cat?.id) {
+        result = await api(`/categories/${cat.id}`, { method: 'PATCH', body: JSON.stringify(form) });
+      } else {
+        result = await api('/categories', { method: 'POST', body: JSON.stringify(form) });
+      }
+      onSave(result);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <h2>{cat?.id ? 'Editar categoría' : 'Nueva categoría'}</h2>
+          <button className="btn-icon" onClick={onClose}>{Ic.close}</button>
+        </div>
+        <div className="field">
+          <label>Nombre</label>
+          <input value={form.label} onChange={e => set('label', e.target.value)} placeholder="Pizzas" />
+        </div>
+        <div className="field">
+          <label>Imagen de portada</label>
+          <ImageUploader value={form.image_url} onChange={v => set('image_url', v)} type="category" aspect="1/1" />
+        </div>
+        <div className="field-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Destacada</label>
+            <select value={form.featured} onChange={e => set('featured', e.target.value === 'true')}>
+              <option value="false">No</option>
+              <option value="true">Sí (aparece primero)</option>
+            </select>
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Activa</label>
+            <select value={form.active} onChange={e => set('active', e.target.value === 'true')}>
+              <option value="true">Sí</option>
+              <option value="false">Oculta</option>
+            </select>
+          </div>
+        </div>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-fluo" onClick={handleSave} disabled={saving}>
+            {saving ? <span className="spinner" /> : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Menu Screen ──────────────────────────────────────────────────
+function MenuScreen() {
+  const [cats, setCats] = useState([]);
+  const [items, setItems] = useState({});       // { catId: [items] }
+  const [expanded, setExpanded] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [catModal, setCatModal] = useState(null);   // null | {} | existing cat
+  const [itemModal, setItemModal] = useState(null); // null | { item, categoryId }
+  const [toast, showToast] = useToast();
+
+  useEffect(() => {
+    api('/categories').then(data => { setCats(data || []); setLoading(false); });
+  }, []);
+
+  async function loadItems(catId) {
+    if (items[catId]) return;
+    const data = await api(`/items?category_id=${catId}`);
+    setItems(prev => ({ ...prev, [catId]: data || [] }));
+  }
+
+  async function toggleExpand(catId) {
+    if (expanded === catId) { setExpanded(null); return; }
+    setExpanded(catId);
+    await loadItems(catId);
+  }
+
+  async function deleteItem(id, catId) {
+    if (!confirm('¿Eliminar este plato?')) return;
+    await api(`/items/${id}`, { method: 'DELETE' });
+    setItems(prev => ({ ...prev, [catId]: prev[catId].filter(i => i.id !== id) }));
+    showToast('Plato eliminado');
+  }
+
+  async function deleteCat(id) {
+    if (!confirm('¿Eliminar esta categoría y todos sus platos?')) return;
+    await api(`/categories/${id}`, { method: 'DELETE' });
+    setCats(prev => prev.filter(c => c.id !== id));
+    showToast('Categoría eliminada');
+  }
+
+  function handleCatSaved(cat) {
+    setCats(prev => {
+      const idx = prev.findIndex(c => c.id === cat.id);
+      return idx >= 0 ? prev.map(c => c.id === cat.id ? cat : c) : [...prev, cat];
+    });
+    setCatModal(null);
+    showToast('Categoría guardada');
+  }
+
+  function handleItemSaved(item) {
+    const catId = item.category_id;
+    setItems(prev => {
+      const list = prev[catId] || [];
+      const idx = list.findIndex(i => i.id === item.id);
+      return { ...prev, [catId]: idx >= 0 ? list.map(i => i.id === item.id ? item : i) : [...list, item] };
+    });
+    setItemModal(null);
+    showToast('Plato guardado');
+  }
+
+  const totalItems = Object.values(items).flat().length;
+
+  return (
+    <div>
+      <div className="stats">
+        <div className="stat-card">
+          <div className="stat-label">Categorías</div>
+          <div className="stat-value">{cats.length}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Platos cargados</div>
+          <div className="stat-value">{totalItems}</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Activas</div>
+          <div className="stat-value">{cats.filter(c => c.active).length}</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-header">
+          <h3>Categorías</h3>
+          <button className="btn btn-fluo btn-sm" onClick={() => setCatModal({})}>
+            {Ic.plus} Nueva categoría
+          </button>
+        </div>
+        {loading ? (
+          <div className="empty-state"><span className="spinner" /></div>
+        ) : cats.length === 0 ? (
+          <div className="empty-state">No hay categorías. ¡Creá la primera!</div>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Categoría</th>
+                <th>Platos</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {cats.map(cat => (
+                <React.Fragment key={cat.id}>
+                  <tr className="cat-row" onClick={() => toggleExpand(cat.id)}>
+                    <td style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ transform: expanded === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform .15s', display: 'inline-flex' }}>{Ic.chev}</span>
+                      {cat.label}
+                      {cat.featured && <span className="badge badge-new">DESTACADA</span>}
+                    </td>
+                    <td><span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{items[cat.id]?.length ?? '—'}</span></td>
+                    <td><span className={`active-dot ${cat.active ? 'on' : 'off'}`} title={cat.active ? 'Activa' : 'Oculta'} /></td>
+                    <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => setCatModal(cat)}>{Ic.edit}</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => deleteCat(cat.id)}>{Ic.trash}</button>
+                    </td>
+                  </tr>
+                  {expanded === cat.id && (
+                    <tr className="cat-items-section">
+                      <td colSpan={4} style={{ padding: '0 0 0 32px' }}>
+                        <div style={{ padding: '10px 20px 10px 0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setItemModal({ item: null, categoryId: cat.id })}>
+                              {Ic.plus} Agregar plato
+                            </button>
+                          </div>
+                          {!items[cat.id] ? (
+                            <div style={{ padding: 16 }}><span className="spinner" /></div>
+                          ) : items[cat.id].length === 0 ? (
+                            <p style={{ color: 'var(--ink-faint)', fontSize: 13, padding: '8px 0' }}>Sin platos en esta categoría</p>
+                          ) : (
+                            <table className="table" style={{ background: 'var(--white)', borderRadius: 10, overflow: 'hidden' }}>
+                              <thead><tr><th>Foto</th><th>Nombre</th><th>Precio</th><th>Etiquetas</th><th>Estado</th><th></th></tr></thead>
+                              <tbody>
+                                {items[cat.id].map(item => (
+                                  <tr key={item.id}>
+                                    <td>
+                                      {item.image_url
+                                        ? <img src={item.image_url} className="plate-thumb" alt="" />
+                                        : <div className="plate-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'var(--ink-faint)', fontFamily: 'JetBrains Mono,monospace' }}>foto</div>
+                                      }
+                                    </td>
+                                    <td style={{ fontWeight: 500 }}>{item.name}</td>
+                                    <td><span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>$ {Number(item.price).toLocaleString('es-AR')}</span></td>
+                                    <td>{item.tags?.map(t => <span key={t} className={`badge badge-${t}`} style={{ marginRight: 3 }}>{TAG_LABELS[t] || t}</span>)}</td>
+                                    <td><span className={`active-dot ${item.active ? 'on' : 'off'}`} /></td>
+                                    <td>
+                                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                        <button className="btn btn-ghost btn-sm" onClick={() => setItemModal({ item, categoryId: cat.id })}>{Ic.edit}</button>
+                                        <button className="btn btn-danger btn-sm" onClick={() => deleteItem(item.id, cat.id)}>{Ic.trash}</button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {catModal !== null && (
+        <CategoryModal cat={catModal.id ? catModal : null} onSave={handleCatSaved} onClose={() => setCatModal(null)} />
+      )}
+      {itemModal !== null && (
+        <ItemModal item={itemModal.item} categoryId={itemModal.categoryId} onSave={handleItemSaved} onClose={() => setItemModal(null)} />
+      )}
+      {toast && <div className="toast-bar">{toast}</div>}
+    </div>
+  );
+}
+
+// ── Dashboard ────────────────────────────────────────────────────
+function DashboardScreen({ user, tenant, onTenantUpdate }) {
+  const slug = tenant?.slug || '—';
+  const menuUrl = `${window.location.origin}/?slug=${slug}`;
+  const [name, setName]       = useState(tenant?.name || '');
+  const [logoUrl, setLogoUrl] = useState(tenant?.logo_url || '');
+  const [saving, setSaving]   = useState(false);
+  const [toast, showToast]    = useToast();
+
+  useEffect(() => {
+    setName(tenant?.name || '');
+    setLogoUrl(tenant?.logo_url || '');
+  }, [tenant?.id]);
+
+  const dirty = (name !== (tenant?.name || '')) || (logoUrl !== (tenant?.logo_url || ''));
+
+  async function save() {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      const updated = await api('/tenant', {
+        method: 'PATCH',
+        body: JSON.stringify({ name: name.trim(), logo_url: logoUrl || null }),
+      });
+      onTenantUpdate(updated);
+      showToast('Cambios guardados');
+    } catch (e) {
+      showToast('Error: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+        <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, marginBottom: 16 }}>Datos del restaurante</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px', gap: 24, alignItems: 'start' }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>NOMBRE</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Nombre del restaurante"
+              style={{
+                width: '100%', padding: '10px 14px', fontSize: 15,
+                border: '1.5px solid var(--line)', borderRadius: 10,
+                background: 'var(--white)', fontFamily: 'inherit',
+              }}
+            />
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'block', marginTop: 16, marginBottom: 6 }}>SLUG</label>
+            <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, background: 'var(--bg)', padding: '8px 12px', borderRadius: 8, display: 'inline-block' }}>{slug}</code>
+            <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 6 }}>El slug no se puede modificar desde acá.</div>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>LOGO</label>
+            <ImageUploader value={logoUrl} onChange={setLogoUrl} type="logo" aspect="1/1" />
+          </div>
+        </div>
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-fluo"
+            onClick={save}
+            disabled={!dirty || saving}
+            style={{ opacity: (!dirty || saving) ? 0.5 : 1 }}
+          >
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+
+      <div className="stats">
+        <div className="stat-card" style={{ gridColumn: 'span 3' }}>
+          <div className="stat-label">URL del menú para QR</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 10 }}>
+            <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13, flex: 1, background: 'var(--bg)', padding: '8px 12px', borderRadius: 8 }}>{menuUrl}</code>
+            <button className="btn btn-fluo btn-sm" onClick={() => { navigator.clipboard.writeText(menuUrl); showToast('Copiado'); }}>Copiar</button>
+            <a className="btn btn-ghost btn-sm" href={menuUrl} target="_blank" rel="noreferrer">Ver</a>
+          </div>
+        </div>
+      </div>
+      <div className="card" style={{ padding: 24 }}>
+        <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, marginBottom: 12 }}>Próximos pasos</h3>
+        <ol style={{ paddingLeft: 20, lineHeight: 2, color: 'var(--ink-soft)', fontSize: 14 }}>
+          <li>Ir a <b>Menú</b> y crear tus categorías (ej: Entradas, Pizzas, Bebidas)</li>
+          <li>Agregar platos a cada categoría con foto, precio y etiquetas</li>
+          <li>Generar el QR de cada mesa en la sección <b>Mesas</b></li>
+          <li>Compartir el link del menú con tus clientes</li>
+        </ol>
+      </div>
+      {toast && <div className="toast-bar">{toast}</div>}
+    </div>
+  );
+}
+
+// ── Image Uploader ───────────────────────────────────────────────
+// Props: value (url), onChange(url), type ('item'|'category'|'logo'), aspect ('4/3'|'1/1')
+function ImageUploader({ value, onChange, type = 'item', aspect = '4/3' }) {
+  const [uploading, setUploading] = useState(false);
+  const [progress,  setProgress]  = useState(0);
+  const [drag,      setDrag]      = useState(false);
+  const [error,     setError]     = useState('');
+  const inputRef = useRef();
+
+  async function handleFile(file) {
+    if (!file) return;
+    const MAX = 10 * 1024 * 1024; // 10 MB — el backend la reduce a ≤2MB
+    if (file.size > MAX) { setError('El archivo supera 10 MB'); return; }
+    if (!file.type.startsWith('image/')) { setError('Solo se admiten imágenes'); return; }
+
+    setError(''); setUploading(true); setProgress(10);
+
+    try {
+      // Preview optimista mientras sube
+      const localUrl = URL.createObjectURL(file);
+      onChange(localUrl);
+      setProgress(40);
+
+      const session = window.__sb ? (await window.__sb.auth.getSession()).data.session : null;
+      const token = session?.access_token;
+
+      const form = new FormData();
+      form.append('file', file);
+
+      const res = await fetch(`${API_BASE}/api/upload/${type}`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      setProgress(90);
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+
+      URL.revokeObjectURL(localUrl);
+      onChange(json.url);
+      setProgress(100);
+      setTimeout(() => setProgress(0), 600);
+    } catch (e) {
+      setError(e.message);
+      setProgress(0);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function onInputChange(e) { handleFile(e.target.files[0]); }
+  function onDrop(e) {
+    e.preventDefault(); setDrag(false);
+    handleFile(e.dataTransfer.files[0]);
+  }
+
+  function clear(e) {
+    e.stopPropagation();
+    onChange('');
+    if (inputRef.current) inputRef.current.value = '';
+  }
+
+  const Ic_img = <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>;
+
+  return (
+    <div>
+      <div
+        className={`img-uploader${value ? ' has-img' : ''}${drag ? ' drag' : ''}`}
+        style={{ aspectRatio: value ? undefined : aspect }}
+        onDragOver={e => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={onDrop}
+        onClick={() => !uploading && inputRef.current?.click()}
+      >
+        <input ref={inputRef} type="file" accept="image/*" onChange={onInputChange} />
+
+        {value ? (
+          <>
+            <img src={value} className="preview" style={{ aspectRatio: aspect }} alt="" />
+            {progress > 0 && progress < 100 && (
+              <div className="img-upload-progress" style={{ width: progress + '%' }} />
+            )}
+            <div className="preview-bar">
+              <span>{uploading ? 'Subiendo…' : 'Clic para cambiar'}</span>
+              {!uploading && (
+                <button
+                  type="button"
+                  className="btn btn-danger btn-sm"
+                  style={{ padding: '4px 8px', flexShrink: 0 }}
+                  onClick={clear}
+                >
+                  Quitar
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="placeholder">
+            {uploading ? <span className="spinner" /> : Ic_img}
+            <p>
+              {uploading
+                ? <><b>Subiendo</b> y optimizando…</>
+                : <><b>Arrastrá</b> una foto o hacé clic<br />JPG, PNG o WebP · máx 10 MB</>
+              }
+            </p>
+          </div>
+        )}
+      </div>
+      {error && <p className="error-msg" style={{ marginTop: 4 }}>{error}</p>}
+    </div>
+  );
+}
+
+// ── Promo Modal ──────────────────────────────────────────────────
+const PROMO_STYLES = ['dark', 'fluo', 'coral', 'bank'];
+const STYLE_LABELS = { dark: 'Oscuro', fluo: 'Lima fluo', coral: 'Coral', bank: 'Banco (azul)' };
+
+function PromoModal({ promo, onSave, onClose }) {
+  const [form, setForm] = useState({
+    tag:        promo?.tag        || '',
+    title:      promo?.title      || '',
+    subtitle:   promo?.subtitle   || '',
+    time_label: promo?.time_label || '',
+    style:      promo?.style      || 'dark',
+    active:     promo?.active     ?? true,
+    starts_at:  promo?.starts_at  ? promo.starts_at.slice(0,16) : '',
+    ends_at:    promo?.ends_at    ? promo.ends_at.slice(0,16)   : '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState('');
+
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function handleSave() {
+    setError(''); setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        starts_at: form.starts_at || null,
+        ends_at:   form.ends_at   || null,
+      };
+      let result;
+      if (promo?.id) {
+        result = await api(`/promotions/${promo.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      } else {
+        result = await api('/promotions', { method: 'POST', body: JSON.stringify(payload) });
+      }
+      onSave(result);
+    } catch (e) { setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  // Preview card live
+  const styleMap = {
+    dark:  { background: '#0d0d0c', color: '#f3efe8' },
+    fluo:  { background: '#d8ff3a', color: '#0d0d0c' },
+    coral: { background: '#ff5a3c', color: '#fff' },
+    bank:  { background: 'linear-gradient(135deg,#0a4a8f,#1a6dc2)', color: '#fff' },
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal" style={{ maxWidth: 580 }}>
+        <div className="modal-header">
+          <h2>{promo?.id ? 'Editar promo' : 'Nueva promo'}</h2>
+          <button className="btn-icon" onClick={onClose}>{Ic.close}</button>
+        </div>
+
+        {/* Live preview */}
+        <div style={{ ...styleMap[form.style], borderRadius: 14, padding: '16px 18px', marginBottom: 20, position: 'relative', minHeight: 90 }}>
+          <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, fontWeight: 700, background: form.style === 'dark' ? '#d8ff3a' : 'rgba(0,0,0,0.18)', color: form.style === 'dark' ? '#0d0d0c' : 'inherit', padding: '3px 7px', borderRadius: 4 }}>
+            {form.tag || 'TAG'}
+          </span>
+          <div style={{ fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, fontSize: 22, marginTop: 6, lineHeight: 1 }}>{form.title || 'Título'}</div>
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>{form.subtitle || 'Subtítulo'} {form.time_label ? '· ' + form.time_label : ''}</div>
+        </div>
+
+        <div className="field-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Etiqueta (tag)</label>
+            <input value={form.tag} onChange={e => set('tag', e.target.value.toUpperCase())} placeholder="2X1" maxLength={12} />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Color / estilo</label>
+            <select value={form.style} onChange={e => set('style', e.target.value)}>
+              {PROMO_STYLES.map(s => <option key={s} value={s}>{STYLE_LABELS[s]}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="field">
+          <label>Título</label>
+          <input value={form.title} onChange={e => set('title', e.target.value)} placeholder="Happy hour" />
+        </div>
+        <div className="field">
+          <label>Subtítulo</label>
+          <input value={form.subtitle} onChange={e => set('subtitle', e.target.value)} placeholder="En todos los tragos seleccionados." />
+        </div>
+        <div className="field-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Horario / texto de tiempo</label>
+            <input value={form.time_label} onChange={e => set('time_label', e.target.value)} placeholder="18 — 20 h" />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Activa</label>
+            <select value={form.active} onChange={e => set('active', e.target.value === 'true')}>
+              <option value="true">Sí</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+        </div>
+        <div className="field-row">
+          <div className="field" style={{ margin: 0 }}>
+            <label>Válida desde (opcional)</label>
+            <input type="datetime-local" value={form.starts_at} onChange={e => set('starts_at', e.target.value)} />
+          </div>
+          <div className="field" style={{ margin: 0 }}>
+            <label>Válida hasta (opcional)</label>
+            <input type="datetime-local" value={form.ends_at} onChange={e => set('ends_at', e.target.value)} />
+          </div>
+        </div>
+        {error && <p className="error-msg">{error}</p>}
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
+          <button className="btn btn-fluo" onClick={handleSave} disabled={saving}>
+            {saving ? <span className="spinner" /> : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Promos Screen ────────────────────────────────────────────────
+function PromosScreen() {
+  const [promos, setPromos]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal]     = useState(null);
+  const [toast, showToast]    = useToast();
+
+  useEffect(() => {
+    api('/promotions').then(d => { setPromos(d || []); setLoading(false); });
+  }, []);
+
+  async function deletePromo(id) {
+    if (!confirm('¿Eliminar esta promo?')) return;
+    await api(`/promotions/${id}`, { method: 'DELETE' });
+    setPromos(p => p.filter(x => x.id !== id));
+    showToast('Promo eliminada');
+  }
+
+  function handleSaved(promo) {
+    setPromos(prev => {
+      const idx = prev.findIndex(p => p.id === promo.id);
+      return idx >= 0 ? prev.map(p => p.id === promo.id ? promo : p) : [...prev, promo];
+    });
+    setModal(null);
+    showToast('Promo guardada');
+  }
+
+  const styleMap = {
+    dark:  { background: '#0d0d0c', color: '#f3efe8' },
+    fluo:  { background: '#d8ff3a', color: '#0d0d0c' },
+    coral: { background: '#ff5a3c', color: '#fff' },
+    bank:  { background: 'linear-gradient(135deg,#0a4a8f,#1a6dc2)', color: '#fff' },
+  };
+
+  return (
+    <div>
+      <div className="card">
+        <div className="card-header">
+          <h3>Promociones activas</h3>
+          <button className="btn btn-fluo btn-sm" onClick={() => setModal({})}>
+            {Ic.plus} Nueva promo
+          </button>
+        </div>
+        {loading ? (
+          <div className="empty-state"><span className="spinner" /></div>
+        ) : promos.length === 0 ? (
+          <div className="empty-state">No hay promos. ¡Creá la primera!</div>
+        ) : (
+          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {promos.map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                {/* mini card preview */}
+                <div style={{ ...styleMap[p.style], borderRadius: 12, padding: '10px 14px', flex: 1, minWidth: 0 }}>
+                  <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 9, fontWeight: 700, background: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: 3 }}>{p.tag}</span>
+                  <div style={{ fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, fontSize: 16, marginTop: 4, lineHeight: 1 }}>{p.title}</div>
+                  {p.subtitle && <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>{p.subtitle}</div>}
+                  {p.time_label && <div style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 10, marginTop: 4, opacity: 0.6 }}>{p.time_label}</div>}
+                </div>
+                {/* estado */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <span className={`active-dot ${p.active ? 'on' : 'off'}`} />
+                  <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono,monospace', color: 'var(--ink-faint)' }}>{p.active ? 'activa' : 'inactiva'}</span>
+                </div>
+                {/* acciones */}
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setModal(p)}>{Ic.edit}</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => deletePromo(p.id)}>{Ic.trash}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {modal !== null && (
+        <PromoModal promo={modal.id ? modal : null} onSave={handleSaved} onClose={() => setModal(null)} />
+      )}
+      {toast && <div className="toast-bar">{toast}</div>}
+    </div>
+  );
+}
+
+// ── QR Canvas ────────────────────────────────────────────────────
+function QRCanvas({ url, size = 180 }) {
+  const containerRef = useRef(null);
+  useEffect(() => {
+    if (!containerRef.current || !url || typeof QRCode === 'undefined') return;
+    containerRef.current.innerHTML = '';
+    new QRCode(containerRef.current, {
+      text: url,
+      width: size,
+      height: size,
+      colorDark: '#0d0d0c',
+      colorLight: '#f3efe8',
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  }, [url, size]);
+  return <div ref={containerRef} style={{ display: 'inline-block' }} />;
+}
+
+// ── Tables Screen ────────────────────────────────────────────────
+function TablesScreen({ slug }) {
+  const [tables, setTables]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [count, setCount]     = useState('');
+  const [adding, setAdding]   = useState(false);
+  const [qrModal, setQrModal] = useState(null); // table object
+  const [toast, showToast]    = useToast();
+
+  const menuBase = `${window.location.origin}/`;
+
+  function tableUrl(t) {
+    return `${menuBase}?slug=${slug}&table=${t.number}`;
+  }
+
+  useEffect(() => {
+    api('/tables').then(d => { setTables(d || []); setLoading(false); });
+  }, []);
+
+  async function addTables() {
+    const n = parseInt(count);
+    if (!n || n < 1) return;
+    setAdding(true);
+    try {
+      const data = await api('/tables', { method: 'POST', body: JSON.stringify({ count: n }) });
+      setTables(prev => [...prev, ...data]);
+      setCount('');
+      showToast(`${n} mesa${n > 1 ? 's' : ''} agregada${n > 1 ? 's' : ''}`);
+    } catch (e) { showToast('Error: ' + e.message); }
+    finally { setAdding(false); }
+  }
+
+  async function deleteTable(id) {
+    if (!confirm('¿Eliminar esta mesa?')) return;
+    await api(`/tables/${id}`, { method: 'DELETE' });
+    setTables(prev => prev.filter(t => t.id !== id));
+    showToast('Mesa eliminada');
+  }
+
+  function downloadQR(t) {
+    const canvas = document.querySelector(`#qr-${t.id} canvas`);
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.download = `mesa-${t.number}-qr.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+  }
+
+  function printAll() {
+    const w = window.open('', '_blank');
+    const canvases = [...document.querySelectorAll('[id^="qr-"] canvas')];
+    const imgs = canvases.map((c, i) => `
+      <div style="page-break-inside:avoid; text-align:center; margin:20px; display:inline-block; width:220px;">
+        <img src="${c.toDataURL()}" width="180" height="180" style="display:block;margin:0 auto;" />
+        <p style="font-family:monospace; font-size:14px; margin-top:8px;"><b>Mesa ${tables[i]?.number}</b></p>
+        <p style="font-family:monospace; font-size:10px; color:#888; word-break:break-all;">${tableUrl(tables[i])}</p>
+      </div>`).join('');
+    w.document.write(`<html><head><title>QRs NuMe</title></head><body style="background:#f3efe8">${imgs}</body></html>`);
+    w.document.close();
+    w.print();
+  }
+
+  return (
+    <div>
+      {/* add tables */}
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-header"><h3>Agregar mesas</h3></div>
+        <div style={{ padding: '16px 20px', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <input
+            type="number" min="1" max="50" value={count}
+            onChange={e => setCount(e.target.value)}
+            placeholder="Cantidad de mesas a agregar"
+            style={{ flex: 1, padding: '10px 14px', border: '1.5px solid var(--line)', borderRadius: 10, font: 'inherit', fontSize: 14 }}
+          />
+          <button className="btn btn-fluo" onClick={addTables} disabled={adding || !count}>
+            {adding ? <span className="spinner" /> : <>{Ic.plus} Agregar</>}
+          </button>
+        </div>
+      </div>
+
+      {/* tables grid */}
+      <div className="card">
+        <div className="card-header">
+          <h3>{tables.length} mesas configuradas</h3>
+          {tables.length > 0 && (
+            <button className="btn btn-ghost btn-sm" onClick={printAll}>Imprimir todos los QR</button>
+          )}
+        </div>
+        {loading ? (
+          <div className="empty-state"><span className="spinner" /></div>
+        ) : tables.length === 0 ? (
+          <div className="empty-state">Agregá mesas para generar sus QRs.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, padding: 20 }}>
+            {tables.map(t => (
+              <div key={t.id} style={{ background: 'var(--bg)', border: '1.5px solid var(--line)', borderRadius: 16, padding: 16, textAlign: 'center', position: 'relative' }}>
+                <div style={{ fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, fontSize: 18, marginBottom: 12 }}>
+                  Mesa <span style={{ background: 'var(--fluo)', padding: '0 6px', borderRadius: 4 }}>{t.number}</span>
+                </div>
+                {/* QR generado inline */}
+                <div id={`qr-${t.id}`} style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                  <QRCanvas url={tableUrl(t)} size={160} />
+                </div>
+                <p style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 9, color: 'var(--ink-faint)', wordBreak: 'break-all', marginBottom: 12, lineHeight: 1.4 }}>
+                  {t.qr_token}
+                </p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-fluo btn-sm" style={{ flex: 1 }} onClick={() => downloadQR(t)}>
+                    ↓ Descargar
+                  </button>
+                  <button className="btn btn-danger btn-sm" onClick={() => deleteTable(t.id)}>{Ic.trash}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {toast && <div className="toast-bar">{toast}</div>}
+    </div>
+  );
+}
+
+// ── Main App ─────────────────────────────────────────────────────
+const Ic2 = {
+  promo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  qr:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/><rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/><rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/><line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="17" y2="14"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="14" y2="17"/><line x1="17" y1="17" x2="20" y2="17"/><line x1="20" y1="20" x2="20" y2="20"/><line x1="14" y1="20" x2="17" y2="20"/></svg>,
+  chart: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>,
+};
+
+// ─── Analytics Screen ──────────────────────────────────────────────────────
+function AnalyticsScreen() {
+  const [data, setData]       = useState(null);
+  const [period, setPeriod]   = useState(7);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    api(`/analytics/admin/summary?period=${period}`)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setError(e.message || 'Error al cargar'); setLoading(false); });
+  }, [period]);
+
+  if (loading) return (
+    <div style={{ padding: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="spinner" />
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ padding: 48, color: 'var(--coral)', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>
+      {error}
+    </div>
+  );
+
+  const { counts, trend, top_items, top_searches, top_promos } = data || {};
+
+  // SVG bar chart for daily trend
+  const BAR_W = 28, BAR_GAP = 6, CHART_H = 80;
+  const maxVal = Math.max(1, ...trend.map(d => d.total));
+  const chartW = trend.length * (BAR_W + BAR_GAP) - BAR_GAP;
+
+  const StatCard = ({ label, value, accent }) => (
+    <div style={{
+      background: accent ? 'var(--ink)' : 'var(--white)',
+      color: accent ? 'var(--fluo)' : 'var(--ink)',
+      borderRadius: 12, padding: '20px 24px',
+      border: '1.5px solid var(--line)',
+      minWidth: 140, flex: 1,
+    }}>
+      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 28, fontWeight: 700, lineHeight: 1 }}>{value.toLocaleString()}</div>
+      <div style={{ fontSize: 12, marginTop: 6, color: accent ? 'rgba(216,255,58,0.7)' : 'var(--ink-faint)', fontWeight: 500 }}>{label}</div>
+    </div>
+  );
+
+  return (
+    <div style={{ padding: '32px', maxWidth: 900 }}>
+      {/* Period picker */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 28 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', marginRight: 4 }}>PERÍODO</span>
+        {[7, 14, 30].map(d => (
+          <button key={d} onClick={() => setPeriod(d)} style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 12, padding: '5px 14px',
+            borderRadius: 8, border: '1.5px solid var(--line)', cursor: 'pointer',
+            background: period === d ? 'var(--ink)' : 'transparent',
+            color: period === d ? 'var(--fluo)' : 'var(--ink)',
+            fontWeight: 600,
+          }}>{d}d</button>
+        ))}
+      </div>
+
+      {/* Stat cards */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 32 }}>
+        <StatCard label="Vistas de menú"   value={counts.menu_views}   accent />
+        <StatCard label="Vistas de platos" value={counts.item_views} />
+        <StatCard label="Favoritos"        value={counts.favorites} />
+        <StatCard label="Búsquedas"        value={counts.searches} />
+        <StatCard label="Clicks en promos" value={counts.promo_clicks} />
+      </div>
+
+      {/* Daily trend chart */}
+      <div style={{ background: 'var(--white)', border: '1.5px solid var(--line)', borderRadius: 12, padding: '24px', marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 20 }}>Vistas de menú — últimos {period} días</div>
+        <div style={{ overflowX: 'auto' }}>
+          <svg width={chartW} height={CHART_H + 24} style={{ display: 'block' }}>
+            {trend.map((d, i) => {
+              const barH = maxVal === 0 ? 0 : Math.max(2, Math.round((d.total / maxVal) * CHART_H));
+              const x = i * (BAR_W + BAR_GAP);
+              const y = CHART_H - barH;
+              const label = d.date.slice(5); // MM-DD
+              return (
+                <g key={d.date}>
+                  <rect x={x} y={y} width={BAR_W} height={barH}
+                    rx="4" fill={d.total === maxVal ? 'var(--fluo)' : 'var(--ink)'}
+                    opacity={d.total === maxVal ? 1 : 0.15} />
+                  {d.total > 0 && (
+                    <text x={x + BAR_W / 2} y={y - 5} textAnchor="middle"
+                      fontSize="9" fill="var(--ink-faint)" fontFamily="JetBrains Mono, monospace">
+                      {d.total}
+                    </text>
+                  )}
+                  <text x={x + BAR_W / 2} y={CHART_H + 18} textAnchor="middle"
+                    fontSize="9" fill="var(--ink-faint)" fontFamily="JetBrains Mono, monospace">
+                    {label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
+        {/* Top items */}
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--line)', borderRadius: 12, padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Platos más vistos</div>
+          {top_items.length === 0
+            ? <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Sin datos aún</div>
+            : top_items.map((item, i) => (
+              <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < top_items.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--ink-faint)', width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--ink-soft)', flexShrink: 0 }}>{item.views}</span>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* Top searches */}
+        <div style={{ background: 'var(--white)', border: '1.5px solid var(--line)', borderRadius: 12, padding: 24 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Búsquedas frecuentes</div>
+          {top_searches.length === 0
+            ? <div style={{ color: 'var(--ink-faint)', fontSize: 13 }}>Sin datos aún</div>
+            : top_searches.map((s, i) => (
+              <div key={s.query} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < top_searches.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--ink-faint)', width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500 }}>{s.query}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--ink-soft)', flexShrink: 0 }}>{s.total}x</span>
+              </div>
+            ))
+          }
+        </div>
+
+        {/* Top promos */}
+        {top_promos.length > 0 && (
+          <div style={{ background: 'var(--white)', border: '1.5px solid var(--line)', borderRadius: 12, padding: 24 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Promos más clickeadas</div>
+            {top_promos.map((p, i) => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < top_promos.length - 1 ? '1px solid var(--line)' : 'none' }}>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--ink-faint)', width: 18, flexShrink: 0 }}>#{i + 1}</span>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: 'var(--ink-soft)', flexShrink: 0 }}>{p.clicks}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const SCREENS = [
+  { id: 'dashboard',  label: 'Inicio',      icon: Ic.home },
+  { id: 'menu',       label: 'Menú',        icon: Ic.menu },
+  { id: 'promos',     label: 'Promociones', icon: Ic2.promo },
+  { id: 'tables',     label: 'Mesas y QR',  icon: Ic2.qr },
+  { id: 'analytics',  label: 'Analytics',   icon: Ic2.chart },
+];
+
+function Admin() {
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [screen, setScreen] = useState('dashboard');
+  const [tenant, setTenant] = useState(null);
+
+  useEffect(() => {
+    if (!sb) { setLoading(false); return; }
+    sb.auth.getSession().then(({ data: { session } }) => {
+      setSession(session); setLoading(false);
+    });
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    api('/tenant').then(setTenant).catch(() => {});
+  }, [session]);
+
+  if (loading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="spinner" />
+    </div>
+  );
+
+  if (!session) return <AuthScreen onAuth={setSession} />;
+
+  const renderScreen = () => {
+    switch (screen) {
+      case 'menu':    return <MenuScreen />;
+      case 'promos':  return <PromosScreen />;
+      case 'tables':    return <TablesScreen slug={tenant?.slug || ''} />;
+      case 'analytics': return <AnalyticsScreen />;
+      default:          return <DashboardScreen user={session.user} tenant={tenant} onTenantUpdate={setTenant} />;
+    }
+  };
+
+  const titles = { dashboard: 'Inicio', menu: 'Gestión de menú', promos: 'Promociones', tables: 'Mesas y QR', analytics: 'Analytics' };
+
+  return (
+    <div className="layout">
+      <aside className="sidebar">
+        <div className="sidebar-logo">Nu<span>Me</span></div>
+        <div className="sidebar-badge">{tenant?.name || session.user.email}</div>
+        <nav className="sidebar-nav">
+          {SCREENS.map(s => (
+            <button key={s.id} className={'nav-item' + (screen === s.id ? ' active' : '')} onClick={() => setScreen(s.id)}>
+              {s.icon}{s.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-footer">
+          <div className="sidebar-email">{session.user.email}</div>
+          <button className="btn-logout" onClick={() => sb.auth.signOut()}>Cerrar sesión</button>
+        </div>
+      </aside>
+      <main className="main">
+        <div className="topbar">
+          <span className="topbar-title">{titles[screen] || screen}</span>
+          <a
+            href={tenant?.slug ? `/?slug=${tenant.slug}` : '/'}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-ghost btn-sm"
+            style={!tenant?.slug ? { opacity: 0.5, pointerEvents: 'none' } : null}
+          >Ver menú →</a>
+        </div>
+        <div className="content">{renderScreen()}</div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Admin />);
+  </script>
+<script>
+  window.__SUPABASE_URL__ = 'https://dffivjkcafkbouztgcau.supabase.co';
+  window.__SUPABASE_ANON__ = 'sb_publishable_GBXBsT_3uPq6D2L-62-KVQ_oxkSgb4U';
+  window.__NUME_API__ = 'http://localhost:3000';
+</script>
+</body>
+</html>

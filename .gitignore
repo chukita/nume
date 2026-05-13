@@ -1,0 +1,28 @@
+# Environment
+.env
+.env.local
+.env*.local
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+
+# Editor / tooling
+.claude/
+.vscode/
+.idea/
+
+# Local artifacts
+uploads/
+
+# Prototype / design handoff files (no se deployan)
+NuMe Prototype.html
+NuMe Wireframes.html
+app.jsx
+design-canvas.jsx
+ios-frame.jsx
+styles.css
+tweaks-panel.jsx
+wireframes.jsx

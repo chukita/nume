@@ -1,0 +1,16 @@
+{
+  "name": "nume-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "dotenv": "^16.5.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "hono": "^4.7.10",
+    "sharp": "^0.33.5"
+  }
+}
