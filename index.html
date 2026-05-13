@@ -1607,6 +1607,7 @@ function useMenuData() {
     heroImg: DEMO_HERO_IMG,
     tenantName: 'NuMe',
     tenantLogoUrl: null,
+    tenantPlan: 'pro', // demo se muestra como pro (sin "powered by")
     loading: false,
     error: null,
   });
@@ -1623,6 +1624,7 @@ function useMenuData() {
           heroImg: DEMO_HERO_IMG,
           tenantName: json.tenant?.name || 'NuMe',
           tenantLogoUrl: json.tenant?.logo_url || null,
+          tenantPlan: json.tenant?.plan || 'free',
           loading: false,
           error: null,
         });
@@ -1763,7 +1765,7 @@ function Plate({ plate, favs, toggleFav, onOpen }) {
 // ─────────── Screens ───────────
 
 function WelcomeScreen({ go, favs }) {
-  const { categories, promos, heroImg } = useMenu();
+  const { categories, promos, heroImg, tenantPlan } = useMenu();
   return (
     <div className="app">
       <div className="topbar">
@@ -1866,6 +1868,16 @@ function WelcomeScreen({ go, favs }) {
             </div>
           ))}
         </div>
+        {tenantPlan === 'free' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '24px 16px 28px', color: 'var(--ink-faint)',
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: 0.08,
+            textTransform: 'lowercase',
+          }}>
+            powered by <Logo />
+          </div>
+        )}
       </div>
     </div>
   );

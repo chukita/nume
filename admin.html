@@ -271,7 +271,14 @@ async function api(path, opts = {}) {
   });
   if (res.status === 204) return null;
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    // El backend devuelve { error, message? }. Preferimos el mensaje legible si vino.
+    const err = new Error(json.message || json.error || `HTTP ${res.status}`);
+    err.code   = json.error;
+    err.status = res.status;
+    err.data   = json;
+    throw err;
+  }
   return json;
 }
 
@@ -458,7 +465,7 @@ function TagsInput({ value, onChange }) {
 }
 
 // ── Item Modal ───────────────────────────────────────────────────
-function ItemModal({ item, categoryId, onSave, onClose }) {
+function ItemModal({ item, categoryId, onSave, onClose, goTo }) {
   const [form, setForm] = useState({
     name: item?.name || '',
     description: item?.description || '',
@@ -469,12 +476,13 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
     category_id: categoryId || item?.category_id || '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
+  const [errorCode, setErrorCode] = useState(null);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
   async function handleSave() {
-    setError(''); setSaving(true);
+    setError(''); setErrorCode(null); setSaving(true);
     try {
       const payload = { ...form, price: Number(form.price) };
       let result;
@@ -484,7 +492,10 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
         result = await api('/items', { method: 'POST', body: JSON.stringify(payload) });
       }
       onSave(result);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      setError(e.message);
+      setErrorCode(e.code || null);
+    }
     finally { setSaving(false); }
   }
 
@@ -524,7 +535,24 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
           <label>Etiquetas</label>
           <TagsInput value={form.tags} onChange={v => set('tags', v)} />
         </div>
-        {error && <p className="error-msg">{error}</p>}
+        {error && errorCode === 'plan_limit_reached' ? (
+          <div style={{
+            marginTop: 12, padding: 14, borderRadius: 10,
+            background: 'var(--bg)', border: '1.5px solid var(--ink)',
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.4 }}>{error}</div>
+            <button
+              type="button"
+              className="btn btn-fluo btn-sm"
+              onClick={() => { onClose(); goTo && goTo('plan'); }}
+            >
+              Ver planes →
+            </button>
+          </div>
+        ) : (
+          error && <p className="error-msg">{error}</p>
+        )}
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-fluo" onClick={handleSave} disabled={saving}>
@@ -607,7 +635,7 @@ function CategoryModal({ cat, onSave, onClose }) {
 }
 
 // ── Menu Screen ──────────────────────────────────────────────────
-function MenuScreen() {
+function MenuScreen({ goTo }) {
   const [cats, setCats] = useState([]);
   const [items, setItems] = useState({});       // { catId: [items] }
   const [expanded, setExpanded] = useState(null);
@@ -777,7 +805,7 @@ function MenuScreen() {
         <CategoryModal cat={catModal.id ? catModal : null} onSave={handleCatSaved} onClose={() => setCatModal(null)} />
       )}
       {itemModal !== null && (
-        <ItemModal item={itemModal.item} categoryId={itemModal.categoryId} onSave={handleItemSaved} onClose={() => setItemModal(null)} />
+        <ItemModal item={itemModal.item} categoryId={itemModal.categoryId} onSave={handleItemSaved} onClose={() => setItemModal(null)} goTo={goTo} />
       )}
       {toast && <div className="toast-bar">{toast}</div>}
     </div>
@@ -840,8 +868,25 @@ function DashboardScreen({ user, tenant, onTenantUpdate }) {
             <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 6 }}>El slug no se puede modificar desde acá.</div>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>LOGO</label>
-            <ImageUploader value={logoUrl} onChange={setLogoUrl} type="logo" aspect="1/1" />
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              LOGO
+              {tenant?.effective_plan === 'free' && (
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, padding: '2px 6px', background: 'var(--ink)', color: 'var(--fluo)', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>PRO</span>
+              )}
+            </label>
+            {tenant?.effective_plan === 'free' ? (
+              <div style={{
+                aspectRatio: '1/1', border: '2px dashed var(--line)', borderRadius: 12,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 8, padding: 24, color: 'var(--ink-faint)', textAlign: 'center', fontSize: 12,
+                background: 'var(--bg)',
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <div><b>Logo personalizado</b><br/>disponible en Pro</div>
+              </div>
+            ) : (
+              <ImageUploader value={logoUrl} onChange={setLogoUrl} type="logo" aspect="1/1" />
+            )}
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
@@ -1714,7 +1759,7 @@ function Admin() {
 
   const renderScreen = () => {
     switch (screen) {
-      case 'menu':    return <MenuScreen />;
+      case 'menu':    return <MenuScreen goTo={setScreen} />;
       case 'promos':  return <PromosScreen />;
       case 'tables':    return <TablesScreen slug={tenant?.slug || ''} />;
       case 'analytics': return <AnalyticsScreen />;

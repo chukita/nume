@@ -55,11 +55,12 @@ admin.get('/tenant', async (c) => {
   const db = c.get('userClient');
   const { data, error } = await db
     .from('tenants')
-    .select('id, slug, name, logo_url, primary_color, plan, active')
+    .select('id, slug, name, logo_url, primary_color, plan, plan_status, trial_ends_at, plan_expires_at, active')
     .eq('id', c.get('tenantId'))
     .single();
   if (error) return c.json({ error: error.message }, 500);
-  return c.json(data);
+  const eff = effectivePlan(data);
+  return c.json({ ...data, effective_plan: eff.plan, is_trial: eff.isTrial });
 });
 
 // GET /api/admin/plan
@@ -191,11 +192,35 @@ admin.get('/items', async (c) => {
 
 // POST /api/admin/items
 admin.post('/items', async (c) => {
-  const db = c.get('userClient');
+  const db  = c.get('userClient');
+  const tid = c.get('tenantId');
   const body = await c.req.json();
+
+  // Plan check: en Free hay tope de FREE_LIMITS.items
+  const { data: tenant } = await db
+    .from('tenants')
+    .select('plan, plan_status, trial_ends_at, plan_expires_at')
+    .eq('id', tid)
+    .single();
+  const eff = effectivePlan(tenant);
+  if (eff.plan === 'free') {
+    const { count } = await db
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tid);
+    if ((count || 0) >= FREE_LIMITS.items) {
+      return c.json({
+        error: 'plan_limit_reached',
+        message: `El plan Free permite hasta ${FREE_LIMITS.items} platos. Pasate a Pro para agregar más.`,
+        limit: FREE_LIMITS.items,
+        used: count,
+      }, 402);
+    }
+  }
+
   const { data, error } = await db
     .from('items')
-    .insert({ ...body, tenant_id: c.get('tenantId') })
+    .insert({ ...body, tenant_id: tid })
     .select()
     .single();
   if (error) return c.json({ error: error.message }, 500);
