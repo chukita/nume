@@ -110,10 +110,15 @@ admin.post('/billing/subscribe', async (c) => {
 
   const body = await c.req.json().catch(() => ({}));
   const backUrl = body.back_url || `${process.env.APP_URL || 'https://nume-lovat.vercel.app'}/admin.html?billing=success`;
+  // El payer_email tiene que ser un usuario de Mercado Pago del mismo
+  // país (Argentina). Si no se especifica, usamos el email del admin —
+  // pero en testing eso suele fallar porque la cuenta de Supabase no
+  // existe en MP. Por eso permitimos pasarlo explícito desde el front.
+  const payerEmail = body.payer_email || user.email;
 
   try {
     const sub = await mp.createSubscription({
-      payerEmail: user.email,
+      payerEmail,
       tenantId: tid,
       backUrl,
     });
