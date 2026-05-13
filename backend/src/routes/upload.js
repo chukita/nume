@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
-import { requireAuth, getServiceClient } from '../middleware/auth.js';
+import { requireAuth, requireTenant, getServiceClient } from '../middleware/auth.js';
 
 const upload = new Hono();
 
 upload.use('*', requireAuth);
+upload.use('*', requireTenant);
 
 // Tamaños máximos por tipo de imagen
 const SIZES = {

@@ -301,6 +301,25 @@ function useToast() {
   return [msg, show];
 }
 
+// ── Auth error messages (humanizar errores de Supabase) ──────────
+function prettifyAuthError(msg) {
+  if (!msg) return 'Ocurrió un error inesperado.';
+  const m = msg.toLowerCase();
+  if (m.includes('email rate limit'))           return 'Demasiados intentos seguidos. Esperá unos minutos antes de volver a intentar.';
+  if (m.includes('rate limit') || m.includes('over_request_rate_limit')) return 'Demasiados intentos seguidos. Probá de nuevo en un rato.';
+  if (m.includes('invalid login credentials'))  return 'Email o contraseña incorrectos.';
+  if (m.includes('email not confirmed'))        return 'Tenés que confirmar tu email antes de ingresar. Revisá tu bandeja.';
+  if (m.includes('user already registered') || m.includes('already exists')) return 'Ya existe una cuenta con ese email. Probá iniciando sesión.';
+  if (m.includes('password should be at least')) return 'La contraseña debe tener al menos 6 caracteres.';
+  if (m.includes('signup is disabled'))         return 'Los registros están deshabilitados temporalmente.';
+  if (m.includes('slug ya está en uso') || m.includes('slug_taken')) return 'Ese identificador (slug) ya está en uso. Probá otro.';
+  if (m.includes('failed to fetch') || m.includes('networkerror')) return 'No pudimos conectarnos al servidor. Revisá tu conexión.';
+  if (m.includes('error sending confirmation email') || m.includes('error sending') || m.includes('smtp')) {
+    return 'No pudimos enviarte el email de confirmación. Probá de nuevo en unos minutos; si persiste, contactanos.';
+  }
+  return msg.charAt(0).toUpperCase() + msg.slice(1);
+}
+
 // ── Auth Screen ──────────────────────────────────────────────────
 function AuthScreen({ onAuth }) {
   const [tab, setTab] = useState('login');
@@ -343,22 +362,30 @@ function AuthScreen({ onAuth }) {
       } else {
         const { data, error: err } = await sb.auth.signUp({ email, password: pass });
         if (err) throw err;
-        // Onboard: crear tenant
-        const token = data.session?.access_token;
-        if (token) {
-          const res = await fetch(`${API_BASE}/api/admin/onboard`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ slug, name }),
-          });
-          const json = await res.json();
-          if (!res.ok) throw new Error(json.error);
+
+        // Si Supabase requiere confirmación por email, data.session llega null.
+        if (!data.session) {
+          throw new Error('Te enviamos un email de confirmación. Confirmalo y volvé a entrar para completar el registro.');
         }
+
+        // Onboard: crear tenant + fila en public.users (lo necesita el hook JWT)
+        const token = data.session.access_token;
+        const res = await fetch(`${API_BASE}/api/admin/onboard`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ slug, name }),
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'No se pudo crear el restaurante');
+
+        // Refrescar la sesión para que el JWT nuevo incluya el tenant_id (vía el hook)
+        const { error: refreshErr } = await sb.auth.refreshSession();
+        if (refreshErr) throw refreshErr;
       }
       const { data: { session } } = await sb.auth.getSession();
       onAuth(session);
     } catch (err) {
-      setError(err.message);
+      setError(prettifyAuthError(err.message));
     } finally {
       setLoading(false);
     }
@@ -1555,8 +1582,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(<Admin />);
 <script>
   window.__SUPABASE_URL__  = 'https://dffivjkcafkbouztgcau.supabase.co';
   window.__SUPABASE_ANON__ = 'sb_publishable_GBXBsT_3uPq6D2L-62-KVQ_oxkSgb4U';
-  window.__NUME_API__ = ['localhost', '127.0.0.1'].includes(location.hostname)
-    ? 'http://localhost:3000'
+  window.__NUME_API__ = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname)
+    ? 'http://' + location.hostname + ':3000'
     : 'https://nume-api-47ej.onrender.com';
 </script>
 </body>

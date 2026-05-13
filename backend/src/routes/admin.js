@@ -1,17 +1,23 @@
 import { Hono } from 'hono';
-import { requireAuth, getServiceClient } from '../middleware/auth.js';
+import { requireAuth, requireTenant, getServiceClient } from '../middleware/auth.js';
 
 const admin = new Hono();
 
-// Todos los endpoints admin requieren JWT válido
+// Todos los endpoints admin requieren JWT válido.
+// Los que además necesitan tenant agregan `requireTenant` después (ver más abajo).
 admin.use('*', requireAuth);
+admin.use('*', async (c, next) => {
+  // /onboard es el único endpoint que se puede llamar SIN tenant
+  if (c.req.path.endsWith('/onboard')) return next();
+  return requireTenant(c, next);
+});
 
 // ─────────── Auth / Onboarding ───────────────────────────────────
 
 // POST /api/admin/onboard
-// Body: { email, password, slug, name }
-// Crea el usuario en Supabase Auth + tenant + mesas por defecto.
-// Usar SOLO en el registro inicial; después el signup lo maneja el cliente.
+// Body: { slug, name }
+// Crea tenant + fila en public.users + mesas por defecto para el usuario
+// recién registrado. Solo funciona si el usuario todavía no tiene tenant.
 admin.post('/onboard', async (c) => {
   // Este endpoint lo llama el frontend justo después del signup de Supabase Auth
   const { slug, name } = await c.req.json();

@@ -13,17 +13,19 @@ const app = new Hono();
 app.use('*', logger());
 
 const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5173',
-  'http://localhost:61224',
   'https://nume-lovat.vercel.app',
 ];
+// Localhost y rangos de IP privados (LAN) — cualquier puerto.
+const LOCAL_ORIGIN_RE = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;
+// Preview deploys de Vercel del mismo proyecto.
+const VERCEL_PREVIEW_RE = /^https:\/\/nume-[\w-]+\.vercel\.app$/;
+
 app.use('*', cors({
   origin: (origin) => {
     if (!origin) return origin; // permitir requests sin origin (curl, server-to-server)
     if (ALLOWED_ORIGINS.includes(origin)) return origin;
-    // Permitir cualquier preview/branch deploy de Vercel del mismo proyecto
-    if (/^https:\/\/nume-[\w-]+\.vercel\.app$/.test(origin)) return origin;
+    if (LOCAL_ORIGIN_RE.test(origin))    return origin;
+    if (VERCEL_PREVIEW_RE.test(origin))  return origin;
     return null;
   },
 }));

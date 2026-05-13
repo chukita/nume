@@ -9,7 +9,7 @@ export function getServiceClient() {
 }
 
 // Middleware Hono: verifica el JWT de Supabase y adjunta el usuario al contexto.
-// Usa el cliente anon para verificar — Supabase valida la firma internamente.
+// NO exige que el usuario tenga tenant — para eso usar `requireTenant` además.
 export async function requireAuth(c, next) {
   const auth = c.req.header('Authorization');
   if (!auth?.startsWith('Bearer ')) {
@@ -37,13 +37,19 @@ export async function requireAuth(c, next) {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
     tenantId = payload.tenant_id || null;
   } catch {}
-  if (!tenantId) tenantId = user.app_metadata?.tenant_id;
-  if (!tenantId) {
-    return c.json({ error: 'Usuario sin tenant asignado' }, 403);
-  }
+  if (!tenantId) tenantId = user.app_metadata?.tenant_id || null;
 
   c.set('user', user);
-  c.set('tenantId', tenantId);
+  c.set('tenantId', tenantId); // puede ser null si todavía no se hizo onboarding
   c.set('userClient', userClient);
+  await next();
+}
+
+// Para endpoints que requieren que el usuario YA tenga tenant.
+// Usar después de requireAuth.
+export async function requireTenant(c, next) {
+  if (!c.get('tenantId')) {
+    return c.json({ error: 'Usuario sin tenant asignado' }, 403);
+  }
   await next();
 }
