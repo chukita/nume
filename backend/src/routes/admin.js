@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { requireAuth, requireTenant, getServiceClient } from '../middleware/auth.js';
 import { effectivePlan, FREE_LIMITS } from '../lib/plan.js';
+import * as mp from '../lib/mercadopago.js';
 
 const admin = new Hono();
 
@@ -93,7 +94,72 @@ admin.get('/plan', async (c) => {
     item_count: itemCount || 0,
     item_limit: eff.plan === 'pro' ? null : FREE_LIMITS.items,
     has_payment_method: !!tenant.billing_subscription_id,
+    pro_price_ars: mp.config.proPriceArs,
+    billing_enabled: mp.config.isConfigured,
   });
+});
+
+// ─────────── Billing (Mercado Pago) ──────────────────────────────
+
+// POST /api/admin/billing/subscribe
+// Crea una suscripción en Mercado Pago y devuelve la URL de checkout.
+// El frontend redirige al usuario a esa URL para autorizar el cobro.
+admin.post('/billing/subscribe', async (c) => {
+  const tid = c.get('tenantId');
+  const user = c.get('user');
+
+  const body = await c.req.json().catch(() => ({}));
+  const backUrl = body.back_url || `${process.env.APP_URL || 'https://nume-lovat.vercel.app'}/admin.html?billing=success`;
+
+  try {
+    const sub = await mp.createSubscription({
+      payerEmail: user.email,
+      tenantId: tid,
+      backUrl,
+    });
+
+    // Guardar la subscription_id para vincular con webhooks
+    const svc = getServiceClient();
+    await svc.from('tenants').update({
+      billing_provider: 'mercadopago',
+      billing_subscription_id: sub.id,
+    }).eq('id', tid);
+
+    return c.json({ init_point: sub.init_point, subscription_id: sub.id, status: sub.status });
+  } catch (e) {
+    console.error('MP createSubscription error:', e.body || e.message);
+    return c.json({ error: 'billing_error', message: e.message }, 500);
+  }
+});
+
+// POST /api/admin/billing/cancel
+// Cancela la suscripción activa. El plan sigue siendo Pro hasta plan_expires_at.
+admin.post('/billing/cancel', async (c) => {
+  const db = c.get('userClient');
+  const tid = c.get('tenantId');
+
+  const { data: tenant } = await db
+    .from('tenants')
+    .select('billing_subscription_id')
+    .eq('id', tid)
+    .single();
+
+  if (!tenant?.billing_subscription_id) {
+    return c.json({ error: 'no_subscription', message: 'No hay una suscripción activa' }, 404);
+  }
+
+  try {
+    await mp.cancelSubscription(tenant.billing_subscription_id);
+    const svc = getServiceClient();
+    await svc.from('tenants').update({
+      plan_status: 'canceled',
+      // plan_expires_at se mantiene — el usuario sigue siendo Pro hasta la fecha que ya pagó
+    }).eq('id', tid);
+    return c.json({ ok: true });
+  } catch (e) {
+    console.error('MP cancelSubscription error:', e.body || e.message);
+    return c.json({ error: 'billing_error', message: e.message }, 500);
+  }
 });
 
 // PATCH /api/admin/tenant

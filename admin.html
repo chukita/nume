@@ -1546,13 +1546,60 @@ function PlanScreen() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  const [subscribing, setSubscribing] = useState(false);
+  const [canceling, setCanceling]     = useState(false);
   const [toast, showToast]    = useToast();
 
-  useEffect(() => {
-    api('/plan')
+  function loadPlan() {
+    return api('/plan')
       .then(d => { setData(d); setLoading(false); })
       .catch(e => { setError(e.message || 'Error al cargar'); setLoading(false); });
+  }
+
+  useEffect(() => {
+    loadPlan();
+    // Si volvimos del checkout de MP, avisar al usuario y refrescar
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('billing') === 'success') {
+      showToast('¡Gracias! Estamos procesando tu suscripción.');
+      // Limpiar el query param
+      const url = new URL(window.location);
+      url.searchParams.delete('billing');
+      window.history.replaceState({}, '', url);
+    }
   }, []);
+
+  async function handleSubscribe() {
+    if (subscribing) return;
+    setSubscribing(true);
+    try {
+      const { init_point } = await api('/billing/subscribe', { method: 'POST', body: '{}' });
+      if (init_point) {
+        window.location.href = init_point;
+      } else {
+        showToast('No pudimos abrir el checkout. Probá de nuevo.');
+        setSubscribing(false);
+      }
+    } catch (e) {
+      showToast(e.message || 'Error al iniciar la suscripción');
+      setSubscribing(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (canceling) return;
+    if (!confirm('¿Cancelar la suscripción? Vas a seguir con Pro hasta la fecha del próximo cobro.')) return;
+    setCanceling(true);
+    try {
+      await api('/billing/cancel', { method: 'POST', body: '{}' });
+      showToast('Suscripción cancelada. Pro sigue activo hasta el próximo vencimiento.');
+      await loadPlan();
+    } catch (e) {
+      showToast(e.message || 'Error al cancelar');
+    } finally {
+      setCanceling(false);
+    }
+  }
 
   if (loading) return (
     <div style={{ padding: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1700,17 +1747,44 @@ function PlanScreen() {
             <Feat ok>Logo personalizado</Feat>
             <Feat ok>Sin "powered by NuMe"</Feat>
           </ul>
-          {(!isPro || isTrial) ? (
-            <button
-              className="btn btn-fluo btn-full"
-              onClick={() => showToast('Pronto vas a poder suscribirte desde acá. Estamos integrando Mercado Pago.')}
-            >
-              {isTrial ? 'Suscribirme antes que termine el trial' : 'Suscribirme a Pro'}
-            </button>
+          {(!isPro || isTrial || data.plan_status === 'canceled') ? (
+            <>
+              <button
+                className="btn btn-fluo btn-full"
+                onClick={handleSubscribe}
+                disabled={subscribing || data.billing_enabled === false}
+                style={{ opacity: subscribing ? 0.7 : 1 }}
+              >
+                {subscribing
+                  ? 'Abriendo Mercado Pago…'
+                  : isTrial
+                    ? 'Suscribirme antes que termine el trial'
+                    : 'Suscribirme a Pro'}
+              </button>
+              {data.billing_enabled === false && (
+                <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 8, textAlign: 'center' }}>
+                  Los pagos online se habilitan próximamente.
+                </div>
+              )}
+            </>
           ) : (
-            <button className="btn btn-ghost btn-full" disabled style={{ opacity: 0.6 }}>
-              Ya estás en Pro
-            </button>
+            <>
+              <div style={{
+                background: 'var(--bg)', borderRadius: 8, padding: '8px 12px',
+                fontSize: 12, color: 'var(--ink-soft)', marginBottom: 10, textAlign: 'center',
+              }}>
+                Próximo cobro:&nbsp;
+                <b>{data.plan_expires_at ? new Date(data.plan_expires_at).toLocaleDateString('es-AR') : '—'}</b>
+              </div>
+              <button
+                className="btn btn-ghost btn-full"
+                onClick={handleCancel}
+                disabled={canceling}
+                style={{ color: 'var(--coral)', borderColor: 'var(--coral)' }}
+              >
+                {canceling ? 'Cancelando…' : 'Cancelar suscripción'}
+              </button>
+            </>
           )}
         </div>
       </div>
