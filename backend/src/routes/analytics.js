@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { supabase } from '../db.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireTenant } from '../middleware/auth.js';
 
 const analytics = new Hono();
 
@@ -52,6 +52,7 @@ analytics.post('/events', async (c) => {
 // ─────────── Analytics admin (requiere auth) ─────────────────────
 
 analytics.use('/admin/*', requireAuth);
+analytics.use('/admin/*', requireTenant);
 
 // GET /api/analytics/admin/summary?period=7
 // Devuelve: totales por tipo, trend diario, top items, top búsquedas
