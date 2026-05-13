@@ -7,6 +7,7 @@ import { menu } from './routes/menu.js';
 import { admin } from './routes/admin.js';
 import { upload } from './routes/upload.js';
 import { analytics } from './routes/analytics.js';
+import { webhooks } from './routes/webhooks.js';
 
 const app = new Hono();
 
@@ -34,6 +35,7 @@ app.route('/api', menu);
 app.route('/api/admin', admin);
 app.route('/api/upload', upload);
 app.route('/api', analytics);
+app.route('/api/webhooks', webhooks);
 
 app.get('/', (c) => c.json({ name: 'NuMe API', version: '0.1.0' }));
 

@@ -271,7 +271,14 @@ async function api(path, opts = {}) {
   });
   if (res.status === 204) return null;
   const json = await res.json();
-  if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    // El backend devuelve { error, message? }. Preferimos el mensaje legible si vino.
+    const err = new Error(json.message || json.error || `HTTP ${res.status}`);
+    err.code   = json.error;
+    err.status = res.status;
+    err.data   = json;
+    throw err;
+  }
   return json;
 }
 
@@ -458,7 +465,7 @@ function TagsInput({ value, onChange }) {
 }
 
 // ── Item Modal ───────────────────────────────────────────────────
-function ItemModal({ item, categoryId, onSave, onClose }) {
+function ItemModal({ item, categoryId, onSave, onClose, goTo }) {
   const [form, setForm] = useState({
     name: item?.name || '',
     description: item?.description || '',
@@ -469,12 +476,13 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
     category_id: categoryId || item?.category_id || '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]   = useState('');
+  const [errorCode, setErrorCode] = useState(null);
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
   async function handleSave() {
-    setError(''); setSaving(true);
+    setError(''); setErrorCode(null); setSaving(true);
     try {
       const payload = { ...form, price: Number(form.price) };
       let result;
@@ -484,7 +492,10 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
         result = await api('/items', { method: 'POST', body: JSON.stringify(payload) });
       }
       onSave(result);
-    } catch (e) { setError(e.message); }
+    } catch (e) {
+      setError(e.message);
+      setErrorCode(e.code || null);
+    }
     finally { setSaving(false); }
   }
 
@@ -524,7 +535,24 @@ function ItemModal({ item, categoryId, onSave, onClose }) {
           <label>Etiquetas</label>
           <TagsInput value={form.tags} onChange={v => set('tags', v)} />
         </div>
-        {error && <p className="error-msg">{error}</p>}
+        {error && errorCode === 'plan_limit_reached' ? (
+          <div style={{
+            marginTop: 12, padding: 14, borderRadius: 10,
+            background: 'var(--bg)', border: '1.5px solid var(--ink)',
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div style={{ flex: 1, minWidth: 200, fontSize: 13, lineHeight: 1.4 }}>{error}</div>
+            <button
+              type="button"
+              className="btn btn-fluo btn-sm"
+              onClick={() => { onClose(); goTo && goTo('plan'); }}
+            >
+              Ver planes →
+            </button>
+          </div>
+        ) : (
+          error && <p className="error-msg">{error}</p>
+        )}
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
           <button className="btn btn-fluo" onClick={handleSave} disabled={saving}>
@@ -607,7 +635,7 @@ function CategoryModal({ cat, onSave, onClose }) {
 }
 
 // ── Menu Screen ──────────────────────────────────────────────────
-function MenuScreen() {
+function MenuScreen({ goTo }) {
   const [cats, setCats] = useState([]);
   const [items, setItems] = useState({});       // { catId: [items] }
   const [expanded, setExpanded] = useState(null);
@@ -777,7 +805,7 @@ function MenuScreen() {
         <CategoryModal cat={catModal.id ? catModal : null} onSave={handleCatSaved} onClose={() => setCatModal(null)} />
       )}
       {itemModal !== null && (
-        <ItemModal item={itemModal.item} categoryId={itemModal.categoryId} onSave={handleItemSaved} onClose={() => setItemModal(null)} />
+        <ItemModal item={itemModal.item} categoryId={itemModal.categoryId} onSave={handleItemSaved} onClose={() => setItemModal(null)} goTo={goTo} />
       )}
       {toast && <div className="toast-bar">{toast}</div>}
     </div>
@@ -840,8 +868,25 @@ function DashboardScreen({ user, tenant, onTenantUpdate }) {
             <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 6 }}>El slug no se puede modificar desde acá.</div>
           </div>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>LOGO</label>
-            <ImageUploader value={logoUrl} onChange={setLogoUrl} type="logo" aspect="1/1" />
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              LOGO
+              {tenant?.effective_plan === 'free' && (
+                <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, padding: '2px 6px', background: 'var(--ink)', color: 'var(--fluo)', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>PRO</span>
+              )}
+            </label>
+            {tenant?.effective_plan === 'free' ? (
+              <div style={{
+                aspectRatio: '1/1', border: '2px dashed var(--line)', borderRadius: 12,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 8, padding: 24, color: 'var(--ink-faint)', textAlign: 'center', fontSize: 12,
+                background: 'var(--bg)',
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <div><b>Logo personalizado</b><br/>disponible en Pro</div>
+              </div>
+            ) : (
+              <ImageUploader value={logoUrl} onChange={setLogoUrl} type="logo" aspect="1/1" />
+            )}
           </div>
         </div>
         <div style={{ marginTop: 20, display: 'flex', justifyContent: 'flex-end' }}>
@@ -1340,6 +1385,7 @@ const Ic2 = {
   promo: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   qr:    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="5" y="5" width="3" height="3" fill="currentColor" stroke="none"/><rect x="16" y="5" width="3" height="3" fill="currentColor" stroke="none"/><rect x="5" y="16" width="3" height="3" fill="currentColor" stroke="none"/><line x1="14" y1="14" x2="14" y2="14"/><line x1="17" y1="14" x2="17" y2="14"/><line x1="20" y1="14" x2="20" y2="14"/><line x1="14" y1="17" x2="14" y2="17"/><line x1="17" y1="17" x2="20" y2="17"/><line x1="20" y1="20" x2="20" y2="20"/><line x1="14" y1="20" x2="17" y2="20"/></svg>,
   chart: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>,
+  card:  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>,
 };
 
 // ─── Analytics Screen ──────────────────────────────────────────────────────
@@ -1495,12 +1541,266 @@ function AnalyticsScreen() {
   );
 }
 
+// ─── Plan Screen ──────────────────────────────────────────────────────
+function PlanScreen() {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+  const [subscribing, setSubscribing] = useState(false);
+  const [canceling, setCanceling]     = useState(false);
+  const [toast, showToast]    = useToast();
+
+  function loadPlan() {
+    return api('/plan')
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setError(e.message || 'Error al cargar'); setLoading(false); });
+  }
+
+  useEffect(() => {
+    loadPlan();
+    // Si volvimos del checkout de MP, avisar al usuario y refrescar
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('billing') === 'success') {
+      showToast('¡Gracias! Estamos procesando tu suscripción.');
+      // Limpiar el query param
+      const url = new URL(window.location);
+      url.searchParams.delete('billing');
+      window.history.replaceState({}, '', url);
+    }
+  }, []);
+
+  async function handleSubscribe() {
+    if (subscribing) return;
+    setSubscribing(true);
+    try {
+      const { init_point } = await api('/billing/subscribe', { method: 'POST', body: '{}' });
+      if (init_point) {
+        window.location.href = init_point;
+      } else {
+        showToast('No pudimos abrir el checkout. Probá de nuevo.');
+        setSubscribing(false);
+      }
+    } catch (e) {
+      showToast(e.message || 'Error al iniciar la suscripción');
+      setSubscribing(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (canceling) return;
+    if (!confirm('¿Cancelar la suscripción? Vas a seguir con Pro hasta la fecha del próximo cobro.')) return;
+    setCanceling(true);
+    try {
+      await api('/billing/cancel', { method: 'POST', body: '{}' });
+      showToast('Suscripción cancelada. Pro sigue activo hasta el próximo vencimiento.');
+      await loadPlan();
+    } catch (e) {
+      showToast(e.message || 'Error al cancelar');
+    } finally {
+      setCanceling(false);
+    }
+  }
+
+  if (loading) return (
+    <div style={{ padding: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="spinner" />
+    </div>
+  );
+  if (error) return (
+    <div style={{ padding: 48, color: 'var(--coral)', fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>{error}</div>
+  );
+
+  const isPro     = data.effective_plan === 'pro';
+  const isTrial   = data.is_trial;
+  const daysLeft  = data.expires_at
+    ? Math.max(0, Math.ceil((new Date(data.expires_at) - Date.now()) / 86400000))
+    : null;
+
+  const Check = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+  const Cross = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+
+  const Feat = ({ ok, children }) => (
+    <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 0', fontSize: 13 }}>
+      <span style={{ color: ok ? 'var(--ink)' : 'var(--ink-faint)', flexShrink: 0, marginTop: 2 }}>
+        {ok ? Check : Cross}
+      </span>
+      <span style={{ color: ok ? 'var(--ink)' : 'var(--ink-faint)' }}>{children}</span>
+    </li>
+  );
+
+  const usagePct = data.item_limit ? Math.min(100, (data.item_count / data.item_limit) * 100) : 0;
+
+  return (
+    <div style={{ padding: 32, maxWidth: 900 }}>
+
+      {/* Estado actual */}
+      <div className="card" style={{ padding: 24, marginBottom: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-faint)', letterSpacing: 0.06, marginBottom: 6 }}>TU PLAN ACTUAL</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <span style={{
+                fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 28, letterSpacing: -0.02,
+              }}>{isPro ? 'Pro' : 'Free'}</span>
+              {isTrial && (
+                <span style={{
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px',
+                  background: 'var(--fluo)', color: 'var(--ink)', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06,
+                }}>PRUEBA GRATIS</span>
+              )}
+              {data.plan_status === 'past_due' && (
+                <span style={{
+                  fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px',
+                  background: 'var(--coral)', color: '#fff', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06,
+                }}>PAGO PENDIENTE</span>
+              )}
+            </div>
+            {isTrial && daysLeft !== null && (
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                {daysLeft === 0
+                  ? <>Hoy es el último día de tu prueba. Suscribite para no perder los beneficios Pro.</>
+                  : <>Te {daysLeft === 1 ? 'queda' : 'quedan'} <b>{daysLeft} {daysLeft === 1 ? 'día' : 'días'}</b> de prueba gratis.</>}
+              </div>
+            )}
+            {!isPro && (
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                Estás usando el plan gratuito. Hacé upgrade para desbloquear platos ilimitados, logo personalizado y más.
+              </div>
+            )}
+            {isPro && !isTrial && (
+              <div style={{ fontSize: 13, color: 'var(--ink-soft)' }}>
+                Tu suscripción Pro está activa{data.expires_at ? <> hasta el <b>{new Date(data.expires_at).toLocaleDateString('es-AR')}</b></> : null}.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Uso de platos (solo importa en Free / trial) */}
+        {data.item_limit !== null && (
+          <div style={{ marginTop: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+              <span style={{ color: 'var(--ink-faint)', fontWeight: 600 }}>PLATOS PUBLICADOS</span>
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>
+                {data.item_count} / {data.item_limit}
+              </span>
+            </div>
+            <div style={{ height: 6, background: 'var(--bg)', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{
+                width: usagePct + '%', height: '100%',
+                background: usagePct >= 100 ? 'var(--coral)' : 'var(--fluo)',
+                transition: 'width .3s',
+              }} />
+            </div>
+            {data.item_count > data.item_limit && (
+              <div style={{ fontSize: 12, color: 'var(--coral)', marginTop: 8 }}>
+                Tenés {data.item_count - data.item_limit} {data.item_count - data.item_limit === 1 ? 'plato oculto' : 'platos ocultos'} para los clientes. Pasate a Pro para mostrarlos todos.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Comparación de planes */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+
+        {/* Free */}
+        <div className="card" style={{ padding: 24, opacity: isPro ? 0.6 : 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22 }}>Free</h3>
+            {!isPro && (
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', background: 'var(--bg)', borderRadius: 999, fontWeight: 600 }}>ACTUAL</span>
+            )}
+          </div>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, marginBottom: 16 }}>
+            $0 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-faint)' }}>/mes</span>
+          </div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            <Feat ok>Hasta 4 platos publicados</Feat>
+            <Feat ok>Categorías ilimitadas</Feat>
+            <Feat ok>Mesas y QRs ilimitados</Feat>
+            <Feat ok>Analytics completo</Feat>
+            <Feat>Logo personalizado</Feat>
+            <Feat>Sin "powered by NuMe"</Feat>
+          </ul>
+        </div>
+
+        {/* Pro */}
+        <div className="card" style={{
+          padding: 24, border: '2px solid var(--ink)', position: 'relative',
+        }}>
+          <div style={{ position: 'absolute', top: 16, right: 16, background: 'var(--fluo)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>RECOMENDADO</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22 }}>Pro</h3>
+            {isPro && !isTrial && (
+              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', background: 'var(--ink)', color: 'var(--fluo)', borderRadius: 999, fontWeight: 600 }}>ACTUAL</span>
+            )}
+          </div>
+          <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, marginBottom: 4 }}>
+            ARS 15.000 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-faint)' }}>/mes</span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ink-faint)', marginBottom: 16 }}>30 días de prueba sin tarjeta</div>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 16px' }}>
+            <Feat ok>Platos ilimitados</Feat>
+            <Feat ok>Categorías ilimitadas</Feat>
+            <Feat ok>Mesas y QRs ilimitados</Feat>
+            <Feat ok>Analytics completo</Feat>
+            <Feat ok>Logo personalizado</Feat>
+            <Feat ok>Sin "powered by NuMe"</Feat>
+          </ul>
+          {(!isPro || isTrial || data.plan_status === 'canceled') ? (
+            <>
+              <button
+                className="btn btn-fluo btn-full"
+                onClick={handleSubscribe}
+                disabled={subscribing || data.billing_enabled === false}
+                style={{ opacity: subscribing ? 0.7 : 1 }}
+              >
+                {subscribing
+                  ? 'Abriendo Mercado Pago…'
+                  : isTrial
+                    ? 'Suscribirme antes que termine el trial'
+                    : 'Suscribirme a Pro'}
+              </button>
+              {data.billing_enabled === false && (
+                <div style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 8, textAlign: 'center' }}>
+                  Los pagos online se habilitan próximamente.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{
+                background: 'var(--bg)', borderRadius: 8, padding: '8px 12px',
+                fontSize: 12, color: 'var(--ink-soft)', marginBottom: 10, textAlign: 'center',
+              }}>
+                Próximo cobro:&nbsp;
+                <b>{data.plan_expires_at ? new Date(data.plan_expires_at).toLocaleDateString('es-AR') : '—'}</b>
+              </div>
+              <button
+                className="btn btn-ghost btn-full"
+                onClick={handleCancel}
+                disabled={canceling}
+                style={{ color: 'var(--coral)', borderColor: 'var(--coral)' }}
+              >
+                {canceling ? 'Cancelando…' : 'Cancelar suscripción'}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {toast && <div className="toast-bar">{toast}</div>}
+    </div>
+  );
+}
+
 const SCREENS = [
   { id: 'dashboard',  label: 'Inicio',      icon: Ic.home },
   { id: 'menu',       label: 'Menú',        icon: Ic.menu },
   { id: 'promos',     label: 'Promociones', icon: Ic2.promo },
   { id: 'tables',     label: 'Mesas y QR',  icon: Ic2.qr },
   { id: 'analytics',  label: 'Analytics',   icon: Ic2.chart },
+  { id: 'plan',       label: 'Mi plan',     icon: Ic2.card },
 ];
 
 function Admin() {
@@ -1533,15 +1833,16 @@ function Admin() {
 
   const renderScreen = () => {
     switch (screen) {
-      case 'menu':    return <MenuScreen />;
+      case 'menu':    return <MenuScreen goTo={setScreen} />;
       case 'promos':  return <PromosScreen />;
       case 'tables':    return <TablesScreen slug={tenant?.slug || ''} />;
       case 'analytics': return <AnalyticsScreen />;
+      case 'plan':      return <PlanScreen />;
       default:          return <DashboardScreen user={session.user} tenant={tenant} onTenantUpdate={setTenant} />;
     }
   };
 
-  const titles = { dashboard: 'Inicio', menu: 'Gestión de menú', promos: 'Promociones', tables: 'Mesas y QR', analytics: 'Analytics' };
+  const titles = { dashboard: 'Inicio', menu: 'Gestión de menú', promos: 'Promociones', tables: 'Mesas y QR', analytics: 'Analytics', plan: 'Mi plan' };
 
   return (
     <div className="layout">
