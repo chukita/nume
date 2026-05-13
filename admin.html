@@ -1571,9 +1571,21 @@ function PlanScreen() {
 
   async function handleSubscribe() {
     if (subscribing) return;
+    // Email de la cuenta de MP del payer. Es obligatorio porque MP exige
+    // que el email del payer pertenezca a una cuenta MP del mismo país.
+    // En producción es el email real del dueño del restaurante.
+    // En testing es el email del "usuario de prueba comprador".
+    const payerEmail = prompt(
+      'Ingresá tu email de Mercado Pago (el de la cuenta con la que vas a pagar):',
+      ''
+    );
+    if (!payerEmail) return;
     setSubscribing(true);
     try {
-      const { init_point } = await api('/billing/subscribe', { method: 'POST', body: '{}' });
+      const { init_point } = await api('/billing/subscribe', {
+        method: 'POST',
+        body: JSON.stringify({ payer_email: payerEmail.trim() }),
+      });
       if (init_point) {
         window.location.href = init_point;
       } else {
