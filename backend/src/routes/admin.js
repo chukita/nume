@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { requireAuth, requireTenant, getServiceClient } from '../middleware/auth.js';
+import { effectivePlan, FREE_LIMITS } from '../lib/plan.js';
 
 const admin = new Hono();
 
@@ -59,6 +60,39 @@ admin.get('/tenant', async (c) => {
     .single();
   if (error) return c.json({ error: error.message }, 500);
   return c.json(data);
+});
+
+// GET /api/admin/plan
+// Estado actual del plan + uso (items vs límite) para la pantalla "Mi plan".
+admin.get('/plan', async (c) => {
+  const db  = c.get('userClient');
+  const tid = c.get('tenantId');
+
+  const { data: tenant, error } = await db
+    .from('tenants')
+    .select('plan, plan_status, trial_ends_at, plan_expires_at, billing_provider, billing_subscription_id')
+    .eq('id', tid)
+    .single();
+  if (error) return c.json({ error: error.message }, 500);
+
+  const { count: itemCount } = await db
+    .from('items')
+    .select('*', { count: 'exact', head: true })
+    .eq('tenant_id', tid);
+
+  const eff = effectivePlan(tenant);
+  return c.json({
+    plan: tenant.plan,
+    plan_status: tenant.plan_status,
+    effective_plan: eff.plan,
+    is_trial: eff.isTrial,
+    trial_ends_at: tenant.trial_ends_at,
+    plan_expires_at: tenant.plan_expires_at,
+    expires_at: eff.expiresAt,
+    item_count: itemCount || 0,
+    item_limit: eff.plan === 'pro' ? null : FREE_LIMITS.items,
+    has_payment_method: !!tenant.billing_subscription_id,
+  });
 });
 
 // PATCH /api/admin/tenant
