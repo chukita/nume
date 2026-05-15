@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>NuMe — Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0d0c'/%3E%3Crect x='6' y='10' width='20' height='12' rx='3' fill='%23d8ff3a'/%3E%3Ctext x='16' y='19.5' font-family='-apple-system,Inter,sans-serif' font-weight='800' font-size='10' text-anchor='middle' fill='%230d0d0c'%3EMe%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -80,6 +81,7 @@
     .topbar-title {
       font-family: 'Space Grotesk', sans-serif; font-weight: 700;
       font-size: 22px; letter-spacing: -0.02em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
     }
     .content { padding: 28px 32px; flex: 1; }
     /* ── Auth screen ── */
@@ -142,11 +144,12 @@
       display: flex; align-items: center; justify-content: space-between;
     }
     .card-header h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; }
-    .table { width: 100%; border-collapse: collapse; }
+    .table { width: 100%; border-collapse: collapse; table-layout: auto; }
     .table th {
       text-align: left; font-family: 'JetBrains Mono', monospace; font-size: 10px;
       letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
       padding: 10px 20px; border-bottom: 1.5px solid var(--line); font-weight: 500;
+      white-space: nowrap;
     }
     .table td { padding: 12px 20px; border-bottom: 1px solid var(--line); vertical-align: middle; }
     .table tr:last-child td { border-bottom: 0; }
@@ -240,6 +243,58 @@
       animation: fadeup .2s ease;
     }
     @keyframes fadeup { from { opacity: 0; transform: translateX(-50%) translateY(8px); } }
+
+    /* ── Hamburger button (oculto en desktop) ───────────────────── */
+    .hamburger {
+      display: none;
+      background: none; border: none; padding: 4px;
+      cursor: pointer; color: var(--ink); border-radius: 6px;
+    }
+    .hamburger:hover { background: var(--bg-2); }
+    .sidebar-backdrop { display: none; }
+
+    /* ── Responsive: tablet y mobile ─────────────────────────────── */
+    @media (max-width: 900px) {
+      .content { padding: 20px 18px; }
+      .stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+      .topbar { padding: 14px 18px; }
+      .modal { max-width: none; }
+    }
+
+    @media (max-width: 700px) {
+      /* Sidebar como drawer */
+      .hamburger { display: inline-flex; align-items: center; justify-content: center; }
+      .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        transform: translateX(-100%); transition: transform .25s ease;
+        z-index: 110; box-shadow: 8px 0 24px rgba(0,0,0,0.25);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-backdrop {
+        display: block; position: fixed; inset: 0;
+        background: rgba(13,13,12,0.5); z-index: 105;
+      }
+      .topbar-title { font-size: 15px; }
+      /* Stats apilados en mobile real */
+      .stats { grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+      .stat-card { padding: 14px 16px; }
+      .stat-value { font-size: 26px; }
+      /* Tablas con scroll horizontal */
+      .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table th, .table td { padding: 10px 14px; }
+      .table th { white-space: nowrap; }
+      .card-header { padding: 16px 18px; flex-wrap: wrap; gap: 8px; }
+      /* Modales casi fullscreen */
+      .modal-overlay { padding: 0; align-items: stretch; }
+      .modal {
+        border-radius: 0; padding: 20px;
+        width: 100%; max-width: none; max-height: none;
+        min-height: 100vh;
+      }
+      .modal-footer { flex-direction: column-reverse; gap: 8px; }
+      .modal-footer .btn { width: 100%; }
+      .field-row { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -738,16 +793,20 @@ function MenuScreen({ goTo }) {
               {cats.map(cat => (
                 <React.Fragment key={cat.id}>
                   <tr className="cat-row" onClick={() => toggleExpand(cat.id)}>
-                    <td style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ transform: expanded === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform .15s', display: 'inline-flex' }}>{Ic.chev}</span>
-                      {cat.label}
-                      {cat.featured && <span className="badge badge-new">DESTACADA</span>}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ transform: expanded === cat.id ? 'rotate(180deg)' : 'none', transition: 'transform .15s', display: 'inline-flex' }}>{Ic.chev}</span>
+                        {cat.label}
+                        {cat.featured && <span className="badge badge-new">DESTACADA</span>}
+                      </div>
                     </td>
                     <td><span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{items[cat.id]?.length ?? '—'}</span></td>
                     <td><span className={`active-dot ${cat.active ? 'on' : 'off'}`} title={cat.active ? 'Activa' : 'Oculta'} /></td>
-                    <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button className="btn btn-ghost btn-sm" onClick={() => setCatModal(cat)}>{Ic.edit}</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => deleteCat(cat.id)}>{Ic.trash}</button>
+                    <td onClick={e => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-ghost btn-sm" onClick={() => setCatModal(cat)}>{Ic.edit}</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => deleteCat(cat.id)}>{Ic.trash}</button>
+                      </div>
                     </td>
                   </tr>
                   {expanded === cat.id && (
@@ -1749,13 +1808,13 @@ function PlanScreen() {
         <div className="card" style={{
           padding: 24, border: '2px solid var(--ink)', position: 'relative',
         }}>
-          <div style={{ position: 'absolute', top: 16, right: 16, background: 'var(--fluo)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>RECOMENDADO</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22 }}>Pro</h3>
+          <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <span style={{ background: 'var(--fluo)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>RECOMENDADO</span>
             {isPro && !isTrial && (
               <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', background: 'var(--ink)', color: 'var(--fluo)', borderRadius: 999, fontWeight: 600 }}>ACTUAL</span>
             )}
           </div>
+          <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 12 }}>Pro</h3>
           <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, marginBottom: 4 }}>
             ARS 15.000 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-faint)' }}>/mes</span>
           </div>
@@ -1829,6 +1888,7 @@ function Admin() {
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState('dashboard');
   const [tenant, setTenant] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!sb) { setLoading(false); return; }
@@ -1865,14 +1925,17 @@ function Admin() {
 
   const titles = { dashboard: 'Inicio', menu: 'Gestión de menú', promos: 'Promociones', tables: 'Mesas y QR', analytics: 'Analytics', plan: 'Mi plan' };
 
+  const closeAndGo = (s) => { setScreen(s); setSidebarOpen(false); };
+
   return (
     <div className="layout">
-      <aside className="sidebar">
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+      <aside className={'sidebar' + (sidebarOpen ? ' open' : '')}>
         <div className="sidebar-logo">Nu<span>Me</span></div>
         <div className="sidebar-badge">{tenant?.name || session.user.email}</div>
         <nav className="sidebar-nav">
           {SCREENS.map(s => (
-            <button key={s.id} className={'nav-item' + (screen === s.id ? ' active' : '')} onClick={() => setScreen(s.id)}>
+            <button key={s.id} className={'nav-item' + (screen === s.id ? ' active' : '')} onClick={() => closeAndGo(s.id)}>
               {s.icon}{s.label}
             </button>
           ))}
@@ -1884,7 +1947,20 @@ function Admin() {
       </aside>
       <main className="main">
         <div className="topbar">
-          <span className="topbar-title">{titles[screen] || screen}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <button
+              className="hamburger"
+              aria-label="Abrir menú"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                <line x1="3" y1="6"  x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            </button>
+            <span className="topbar-title">{titles[screen] || screen}</span>
+          </div>
           <a
             href={tenant?.slug ? `/?slug=${tenant.slug}` : '/'}
             target="_blank"
