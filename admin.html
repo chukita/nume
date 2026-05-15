@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>NuMe — Admin</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0d0c'/%3E%3Crect x='6' y='10' width='20' height='12' rx='3' fill='%23d8ff3a'/%3E%3Ctext x='16' y='19.5' font-family='-apple-system,Inter,sans-serif' font-weight='800' font-size='10' text-anchor='middle' fill='%230d0d0c'%3EMe%3C/text%3E%3C/svg%3E" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -1749,13 +1750,13 @@ function PlanScreen() {
         <div className="card" style={{
           padding: 24, border: '2px solid var(--ink)', position: 'relative',
         }}>
-          <div style={{ position: 'absolute', top: 16, right: 16, background: 'var(--fluo)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>RECOMENDADO</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22 }}>Pro</h3>
+          <div style={{ position: 'absolute', top: 16, right: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            <span style={{ background: 'var(--fluo)', color: 'var(--ink)', fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', borderRadius: 999, fontWeight: 700, letterSpacing: 0.06 }}>RECOMENDADO</span>
             {isPro && !isTrial && (
               <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, padding: '4px 10px', background: 'var(--ink)', color: 'var(--fluo)', borderRadius: 999, fontWeight: 600 }}>ACTUAL</span>
             )}
           </div>
+          <h3 style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 22, marginBottom: 12 }}>Pro</h3>
           <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 32, marginBottom: 4 }}>
             ARS 15.000 <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink-faint)' }}>/mes</span>
           </div>
