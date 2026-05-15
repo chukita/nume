@@ -1557,15 +1557,24 @@ function PlanScreen() {
   }
 
   useEffect(() => {
-    loadPlan();
-    // Si volvimos del checkout de MP, avisar al usuario y refrescar
     const params = new URLSearchParams(window.location.search);
     if (params.get('billing') === 'success') {
-      showToast('¡Gracias! Estamos procesando tu suscripción.');
       // Limpiar el query param
       const url = new URL(window.location);
       url.searchParams.delete('billing');
       window.history.replaceState({}, '', url);
+      // Forzar un sync con MP por si el webhook todavía no llegó
+      showToast('Confirmando tu suscripción...');
+      api('/billing/sync', { method: 'POST', body: '{}' })
+        .then((res) => {
+          if (res?.mp_status === 'authorized') showToast('¡Suscripción activada!');
+          else if (res?.mp_status === 'pending') showToast('Procesando el cobro. Recargá en unos minutos.');
+          else showToast('Estado actualizado.');
+        })
+        .catch(() => showToast('No pudimos confirmar al toque — el sistema lo va a procesar igual.'))
+        .finally(() => loadPlan());
+    } else {
+      loadPlan();
     }
   }, []);
 

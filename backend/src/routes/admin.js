@@ -137,6 +137,60 @@ admin.post('/billing/subscribe', async (c) => {
   }
 });
 
+// POST /api/admin/billing/sync
+// Consulta directo a MP el estado de la suscripción y refleja en nuestra DB.
+// Útil para no depender del webhook (el usuario vuelve del checkout y nuestro
+// frontend dispara este endpoint para tener el estado real al toque).
+admin.post('/billing/sync', async (c) => {
+  const db  = c.get('userClient');
+  const tid = c.get('tenantId');
+
+  const { data: tenant } = await db
+    .from('tenants')
+    .select('billing_subscription_id')
+    .eq('id', tid)
+    .single();
+
+  if (!tenant?.billing_subscription_id) {
+    return c.json({ error: 'no_subscription', message: 'No hay suscripción para sincronizar' }, 404);
+  }
+
+  try {
+    const sub = await mp.getSubscription(tenant.billing_subscription_id);
+    // Mapear estado MP → nuestro
+    let plan_status, plan = 'free', plan_expires_at = null;
+    switch (sub.status) {
+      case 'authorized':
+        plan_status     = 'active';
+        plan            = 'pro';
+        plan_expires_at = sub.next_payment_date
+          ? new Date(sub.next_payment_date).toISOString()
+          : new Date(Date.now() + 31 * 86400000).toISOString();
+        break;
+      case 'paused':    plan_status = 'past_due'; break;
+      case 'cancelled': plan_status = 'canceled'; break;
+      case 'pending':   plan_status = null; break;
+      default:          plan_status = null;
+    }
+
+    const update = {};
+    if (plan_status !== null) update.plan_status = plan_status;
+    if (plan === 'pro')       update.plan = 'pro';
+    if (plan_expires_at)      update.plan_expires_at = plan_expires_at;
+
+    if (Object.keys(update).length > 0) {
+      const svc = getServiceClient();
+      const { error } = await svc.from('tenants').update(update).eq('id', tid);
+      if (error) return c.json({ error: 'db_error', message: error.message }, 500);
+    }
+
+    return c.json({ ok: true, mp_status: sub.status, applied: update });
+  } catch (e) {
+    console.error('MP sync error:', e.body || e.message);
+    return c.json({ error: 'billing_error', message: e.message }, 500);
+  }
+});
+
 // POST /api/admin/billing/cancel
 // Cancela la suscripción activa. El plan sigue siendo Pro hasta plan_expires_at.
 admin.post('/billing/cancel', async (c) => {
