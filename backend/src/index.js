@@ -15,6 +15,8 @@ app.use('*', logger());
 
 const ALLOWED_ORIGINS = [
   'https://nume-lovat.vercel.app',
+  'https://nume.com.ar',
+  'https://www.nume.com.ar',
 ];
 // Localhost y rangos de IP privados (LAN) — cualquier puerto.
 const LOCAL_ORIGIN_RE = /^https?:\/\/(localhost|127\.\d+\.\d+\.\d+|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/;

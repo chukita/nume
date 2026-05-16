@@ -874,7 +874,7 @@ function MenuScreen({ goTo }) {
 // ── Dashboard ────────────────────────────────────────────────────
 function DashboardScreen({ user, tenant, onTenantUpdate }) {
   const slug = tenant?.slug || '—';
-  const menuUrl = `${window.location.origin}/?slug=${slug}`;
+  const menuUrl = `${window.location.origin}/menu?slug=${slug}`;
   const [name, setName]       = useState(tenant?.name || '');
   const [logoUrl, setLogoUrl] = useState(tenant?.logo_url || '');
   const [saving, setSaving]   = useState(false);
@@ -1325,7 +1325,7 @@ function TablesScreen({ slug }) {
   const [qrModal, setQrModal] = useState(null); // table object
   const [toast, showToast]    = useToast();
 
-  const menuBase = `${window.location.origin}/`;
+  const menuBase = `${window.location.origin}/menu`;
 
   function tableUrl(t) {
     return `${menuBase}?slug=${slug}&table=${t.number}`;
@@ -1962,7 +1962,7 @@ function Admin() {
             <span className="topbar-title">{titles[screen] || screen}</span>
           </div>
           <a
-            href={tenant?.slug ? `/?slug=${tenant.slug}` : '/'}
+            href={tenant?.slug ? `/menu?slug=${tenant.slug}` : '/menu'}
             target="_blank"
             rel="noreferrer"
             className="btn btn-ghost btn-sm"
